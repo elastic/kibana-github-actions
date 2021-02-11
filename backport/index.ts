@@ -3,12 +3,12 @@ import * as core from '@actions/core';
 import { exec } from '@actions/exec';
 import { context } from '@actions/github';
 import { run, ConfigOptions } from 'backport';
-import createStatusComment from './createStatuscomment';
+import createStatusComment from './createStatusComment';
 
 export const getConfig = async (repoOwner: string, repoName: string, branch: string) => {
   const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/.backportrc.json`;
   const resp = await axios.get(url);
-  return JSON.parse(resp.data) as ConfigOptions;
+  return resp.data as ConfigOptions;
 };
 
 async function backport() {
