@@ -1,0 +1,21 @@
+name: 'Backport Action'
+description: 'Backport merged pull requests to other branches via labels'
+inputs:
+  branch:
+    description: The target branch for merged pull requests
+    required: true
+  github_token:
+    description: An oauth token that will be used to create the backport pull requests and perform other operations
+    required: true
+  commit_user:
+    description: The username that will be used to commit the cherry-picks for the backport branches
+    required: true
+  commit_email:
+    description: The e-mail address that will be used to commit the cherry-picks for the backport branches
+    required: true
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
+branding:
+  icon: git-branch
+  color: green
