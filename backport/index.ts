@@ -31,16 +31,19 @@ async function backport() {
 
   const config = await getConfig(repo.owner, repo.repo, branch);
 
-  const backportResponse = await run({
-    ...config,
-    accessToken,
-    fork: true,
-    username: commitUser,
-    ci: true,
-    pullNumber: pullRequest.number,
-    labels: ['backport'],
-    assignees: [owner],
-  });
+  const backportResponse = await run(
+    {
+      ...config,
+      accessToken,
+      fork: true,
+      username: commitUser,
+      ci: true,
+      pullNumber: pullRequest.number,
+      labels: ['backport'],
+      assignees: [owner],
+    },
+    ['--autoMerge', '--autoMergeMethod', 'squash'],
+  );
 
   await createStatusComment({
     accessToken,
