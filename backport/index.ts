@@ -42,7 +42,7 @@ async function backport() {
       labels: ['backport'],
       assignees: [owner],
     },
-    ['--autoMerge', '--autoMergeMethod', 'squash'],
+    ['--autoMerge', 'true', '--autoMergeMethod', 'squash'],
   );
 
   await createStatusComment({

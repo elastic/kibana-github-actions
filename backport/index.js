@@ -35,7 +35,7 @@ async function backport() {
         pullNumber: pullRequest.number,
         labels: ['backport'],
         assignees: [owner],
-    }, ['--autoMerge', '--autoMergeMethod', 'squash']);
+    }, ['--autoMerge', 'true', '--autoMergeMethod', 'squash']);
     await createStatusComment_1.default({
         accessToken,
         repoOwner: repo.owner,
