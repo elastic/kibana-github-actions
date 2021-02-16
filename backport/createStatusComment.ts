@@ -32,8 +32,6 @@ export const getCommentFromResponse = (pullNumber: number, backportResponse: Bac
       [
         'To backport manually, check out the target branch and run:',
         `\`node scripts/backport --pr ${pullNumber}\``,
-        'or',
-        `\`backport --labels backport --pr ${pullNumber}\``,
       ].join('\n'),
     );
   }

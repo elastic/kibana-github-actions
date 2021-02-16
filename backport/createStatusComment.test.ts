@@ -56,9 +56,7 @@ Successful backport PRs will be merged automatically after passing CI.`,
 Successful backport PRs will be merged automatically after passing CI.
 
 To backport manually, check out the target branch and run:
-\`node scripts/backport --pr 1\`
-or
-\`backport --labels backport --pr 1\``,
+\`node scripts/backport --pr 1\``,
       );
     });
 
@@ -86,9 +84,7 @@ or
 ❌ 7.10: There was a merge conflict
 
 To backport manually, check out the target branch and run:
-\`node scripts/backport --pr 1\`
-or
-\`backport --labels backport --pr 1\``,
+\`node scripts/backport --pr 1\``,
       );
     });
   });
