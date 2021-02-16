@@ -24,8 +24,6 @@ exports.getCommentFromResponse = (pullNumber, backportResponse) => {
         helpParts.push([
             'To backport manually, check out the target branch and run:',
             `\`node scripts/backport --pr ${pullNumber}\``,
-            'or',
-            `\`backport --labels backport --pr ${pullNumber}\``,
         ].join('\n'));
     }
     const helpMessage = helpParts.join('\n\n');
