@@ -2,7 +2,7 @@ import { BackportResponse } from 'backport';
 import { Octokit } from '@octokit/rest';
 
 export const getCommentFromResponse = (pullNumber: number, backportResponse: BackportResponse): string => {
-  const hasAnySuccessful = !!backportResponse.results.find((r) => r.success);
+  const hasAnySuccessful = backportResponse.results.some((r) => r.success);
 
   const header = backportResponse.success ? '## 💚 Backport successful' : '## 💔 Backport failed';
 
@@ -24,13 +24,17 @@ export const getCommentFromResponse = (pullNumber: number, backportResponse: Bac
   const helpParts = [];
 
   if (hasAnySuccessful) {
-    helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
+    if (backportResponse.results.length === 1) {
+      helpParts.push('This backport PR will be merged automatically after passing CI.'); 
+    } else {
+      helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
+    }
   }
 
   if (!backportResponse.success) {
     helpParts.push(
       [
-        'To backport manually, check out the target branch and run:',
+        'To backport manually run:',
         `\`node scripts/backport --pr ${pullNumber}\``,
       ].join('\n'),
     );
