@@ -3,6 +3,7 @@ import { Octokit } from '@octokit/rest';
 
 export const getCommentFromResponse = (pullNumber: number, backportResponse: BackportResponse): string => {
   const hasAnySuccessful = backportResponse.results.some((r) => r.success);
+  const hasAllSuccessful = backportResponse.results.every((r) => r.success);
 
   const header = backportResponse.success ? '## 💚 Backport successful' : '## 💔 Backport failed';
 
@@ -23,7 +24,9 @@ export const getCommentFromResponse = (pullNumber: number, backportResponse: Bac
 
   const helpParts = [];
 
-  if (hasAnySuccessful) {
+  if (hasAllSuccessful) {
+    helpParts.push('The backport PRs will be merged automatically after passing CI.');     
+  } else if (hasAnySuccessful) {
     if (backportResponse.results.length === 1) {
       helpParts.push('This backport PR will be merged automatically after passing CI.'); 
     } else {
