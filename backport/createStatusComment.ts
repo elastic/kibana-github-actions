@@ -25,13 +25,13 @@ export const getCommentFromResponse = (pullNumber: number, backportResponse: Bac
   const helpParts = [];
 
   if (hasAllSuccessful) {
-    helpParts.push('The backport PRs will be merged automatically after passing CI.');     
-  } else if (hasAnySuccessful) {
     if (backportResponse.results.length === 1) {
       helpParts.push('This backport PR will be merged automatically after passing CI.'); 
     } else {
-      helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
-    }
+      helpParts.push('The backport PRs will be merged automatically after passing CI.');     
+    }    
+  } else if (hasAnySuccessful) {
+    helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
   }
 
   if (!backportResponse.success) {
