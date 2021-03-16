@@ -21,10 +21,19 @@ async function backport() {
   const pullRequest = payload.pull_request;
   const owner: string = pullRequest.user.login;
 
-  const branch = core.getInput('branch', { required: true });
+  const branch: string = pullRequest?.base?.ref;
+
+  if (!branch) {
+    throw Error("Can't determine PR base branch.");
+  }
+
   const accessToken = core.getInput('github_token', { required: true });
   const commitUser = core.getInput('commit_user', { required: true });
   const commitEmail = core.getInput('commit_email', { required: true });
+
+  const autoMerge = core.getInput('auto_merge', { required: true }) === 'true';
+  const autoMergeMethod = core.getInput('auto_merge_method', { required: true });
+  const backportCommandTemplate = core.getInput('manual_backport_command_template', { required: true });
 
   await exec(`git config --global user.name "${commitUser}"`);
   await exec(`git config --global user.email "${commitEmail}"`);
@@ -40,8 +49,8 @@ async function backport() {
     pullNumber: pullRequest.number,
     labels: ['backport'],
     assignees: [owner],
-    autoMerge: true,
-    autoMergeMethod: 'squash',
+    autoMerge: autoMerge,
+    autoMergeMethod: autoMergeMethod,
   });
 
   await createStatusComment({
@@ -49,6 +58,7 @@ async function backport() {
     repoOwner: repo.owner,
     repoName: repo.repo,
     pullNumber: pullRequest.number,
+    backportCommandTemplate,
     backportResponse,
   });
 }

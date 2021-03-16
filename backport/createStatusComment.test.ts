@@ -2,10 +2,12 @@ import { BackportResponse } from 'backport';
 import { expect } from 'chai';
 import { getCommentFromResponse } from './createStatusComment';
 
+const BACKPORT_TEMPLATE = 'node scripts/backport --pr %pullNumber%';
+
 describe('createStatusComment', () => {
   describe('getCommentFromResponse', () => {
     it('should create a message for all successful backports', async () => {
-      const comment = getCommentFromResponse(1, {
+      const comment = getCommentFromResponse(1, BACKPORT_TEMPLATE, {
         results: [
           {
             success: true,
@@ -31,7 +33,7 @@ Successful backport PRs will be merged automatically after passing CI.`,
     });
 
     it('should create a message for a mix of successful and failed backports', async () => {
-      const comment = getCommentFromResponse(1, {
+      const comment = getCommentFromResponse(1, BACKPORT_TEMPLATE, {
         results: [
           {
             success: true,
@@ -61,7 +63,7 @@ To backport manually, check out the target branch and run:
     });
 
     it('should create a message for a all failed backports', async () => {
-      const comment = getCommentFromResponse(1, {
+      const comment = getCommentFromResponse(1, BACKPORT_TEMPLATE, {
         results: [
           {
             success: false,

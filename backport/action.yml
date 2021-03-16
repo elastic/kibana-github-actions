@@ -1,9 +1,6 @@
 name: 'Backport Action'
 description: 'Backport merged pull requests to other branches via labels'
 inputs:
-  branch:
-    description: The target branch for merged pull requests
-    required: true
   github_token:
     description: An oauth token that will be used to create the backport pull requests and perform other operations
     required: true
@@ -13,6 +10,18 @@ inputs:
   commit_email:
     description: The e-mail address that will be used to commit the cherry-picks for the backport branches
     required: true
+  auto_merge:
+    description: Enable auto-merge for created backport PRs
+    required: false
+    default: 'true'
+  auto_merge_method:
+    description: 'When enabling auto-merge, sets the auto-merge method. Possible values are: merge, rebase, squash'
+    required: false
+    default: 'squash'
+  manual_backport_command_template:
+    description: ''
+    required: false
+    default: 'node scripts/backport --pr %pullNumber%'
 runs:
   using: 'node12'
   main: 'index.js'

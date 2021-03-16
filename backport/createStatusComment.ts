@@ -1,7 +1,11 @@
 import { BackportResponse } from 'backport';
 import { Octokit } from '@octokit/rest';
 
-export const getCommentFromResponse = (pullNumber: number, backportResponse: BackportResponse): string => {
+export const getCommentFromResponse = (
+  pullNumber: number,
+  backportCommandTemplate: string,
+  backportResponse: BackportResponse,
+): string => {
   const hasAnySuccessful = !!backportResponse.results.find((r) => r.success);
 
   const header = backportResponse.success ? '## 💚 Backport successful' : '## 💔 Backport failed';
@@ -31,7 +35,7 @@ export const getCommentFromResponse = (pullNumber: number, backportResponse: Bac
     helpParts.push(
       [
         'To backport manually, check out the target branch and run:',
-        `\`node scripts/backport --pr ${pullNumber}\``,
+        `\`${backportCommandTemplate.replace('%pullNumber%', pullNumber.toString())}\``,
       ].join('\n'),
     );
   }
@@ -46,9 +50,10 @@ export default async function createStatusComment(options: {
   repoOwner: string;
   repoName: string;
   pullNumber: number;
+  backportCommandTemplate: string;
   backportResponse: BackportResponse;
 }) {
-  const { accessToken, repoOwner, repoName, pullNumber, backportResponse } = options;
+  const { accessToken, repoOwner, repoName, pullNumber, backportCommandTemplate, backportResponse } = options;
 
   const octokit = new Octokit({
     auth: accessToken,
@@ -58,6 +63,6 @@ export default async function createStatusComment(options: {
     owner: repoOwner,
     repo: repoName,
     issue_number: pullNumber,
-    body: getCommentFromResponse(pullNumber, backportResponse),
+    body: getCommentFromResponse(pullNumber, backportCommandTemplate, backportResponse),
   });
 }

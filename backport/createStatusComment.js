@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCommentFromResponse = void 0;
 const rest_1 = require("@octokit/rest");
-exports.getCommentFromResponse = (pullNumber, backportResponse) => {
+exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportResponse) => {
     const hasAnySuccessful = !!backportResponse.results.find((r) => r.success);
     const header = backportResponse.success ? '## 💚 Backport successful' : '## 💔 Backport failed';
     const detailsList = backportResponse.results
@@ -23,14 +23,14 @@ exports.getCommentFromResponse = (pullNumber, backportResponse) => {
     if (!backportResponse.success) {
         helpParts.push([
             'To backport manually, check out the target branch and run:',
-            `\`node scripts/backport --pr ${pullNumber}\``,
+            `\`${backportCommandTemplate.replace('%pullNumber%', pullNumber.toString())}\``,
         ].join('\n'));
     }
     const helpMessage = helpParts.join('\n\n');
     return [header, detailsList, generalErrorMessage, helpMessage].filter((m) => m).join('\n\n');
 };
 async function createStatusComment(options) {
-    const { accessToken, repoOwner, repoName, pullNumber, backportResponse } = options;
+    const { accessToken, repoOwner, repoName, pullNumber, backportCommandTemplate, backportResponse } = options;
     const octokit = new rest_1.Octokit({
         auth: accessToken,
     });
@@ -38,7 +38,7 @@ async function createStatusComment(options) {
         owner: repoOwner,
         repo: repoName,
         issue_number: pullNumber,
-        body: exports.getCommentFromResponse(pullNumber, backportResponse),
+        body: exports.getCommentFromResponse(pullNumber, backportCommandTemplate, backportResponse),
     });
 }
 exports.default = createStatusComment;
