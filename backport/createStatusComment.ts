@@ -1,7 +1,11 @@
 import { BackportResponse } from 'backport';
 import { Octokit } from '@octokit/rest';
 
-export const getCommentFromResponse = (pullNumber: number, backportResponse: BackportResponse): string => {
+export const getCommentFromResponse = (
+  pullNumber: number,
+  backportCommandTemplate: string,
+  backportResponse: BackportResponse,
+): string => {
   const hasAnySuccessful = backportResponse.results.some((r) => r.success);
   const hasAllSuccessful = backportResponse.results.every((r) => r.success);
 
@@ -26,10 +30,10 @@ export const getCommentFromResponse = (pullNumber: number, backportResponse: Bac
 
   if (hasAllSuccessful) {
     if (backportResponse.results.length === 1) {
-      helpParts.push('This backport PR will be merged automatically after passing CI.'); 
+      helpParts.push('This backport PR will be merged automatically after passing CI.');
     } else {
-      helpParts.push('The backport PRs will be merged automatically after passing CI.');     
-    }    
+      helpParts.push('The backport PRs will be merged automatically after passing CI.');
+    }
   } else if (hasAnySuccessful) {
     helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
   }
@@ -38,7 +42,7 @@ export const getCommentFromResponse = (pullNumber: number, backportResponse: Bac
     helpParts.push(
       [
         'To backport manually run:',
-        `\`node scripts/backport --pr ${pullNumber}\``,
+        `\`${backportCommandTemplate.replace('%pullNumber%', pullNumber.toString())}\``,
       ].join('\n'),
     );
   }
@@ -53,9 +57,10 @@ export default async function createStatusComment(options: {
   repoOwner: string;
   repoName: string;
   pullNumber: number;
+  backportCommandTemplate: string;
   backportResponse: BackportResponse;
 }) {
-  const { accessToken, repoOwner, repoName, pullNumber, backportResponse } = options;
+  const { accessToken, repoOwner, repoName, pullNumber, backportCommandTemplate, backportResponse } = options;
 
   const octokit = new Octokit({
     auth: accessToken,
@@ -65,6 +70,6 @@ export default async function createStatusComment(options: {
     owner: repoOwner,
     repo: repoName,
     issue_number: pullNumber,
-    body: getCommentFromResponse(pullNumber, backportResponse),
+    body: getCommentFromResponse(pullNumber, backportCommandTemplate, backportResponse),
   });
 }

@@ -2,10 +2,12 @@ import { BackportResponse } from 'backport';
 import { expect } from 'chai';
 import { getCommentFromResponse } from './createStatusComment';
 
+const BACKPORT_TEMPLATE = 'node scripts/backport --pr %pullNumber%';
+
 describe('createStatusComment', () => {
   describe('getCommentFromResponse', () => {
     it('should create a message for all successful backports', async () => {
-      const comment = getCommentFromResponse(1, {
+      const comment = getCommentFromResponse(1, BACKPORT_TEMPLATE, {
         results: [
           {
             success: true,
@@ -26,12 +28,12 @@ describe('createStatusComment', () => {
 ✅ [7.x](https://github.com/elastic/kibana/pull/2) / https://github.com/elastic/kibana/pull/2
 ✅ [7.10](https://github.com/elastic/kibana/pull/3) / https://github.com/elastic/kibana/pull/3
 
-Successful backport PRs will be merged automatically after passing CI.`,
+The backport PRs will be merged automatically after passing CI.`,
       );
     });
 
     it('should create a message for a mix of successful and failed backports', async () => {
-      const comment = getCommentFromResponse(1, {
+      const comment = getCommentFromResponse(1, BACKPORT_TEMPLATE, {
         results: [
           {
             success: true,
@@ -53,7 +55,7 @@ Successful backport PRs will be merged automatically after passing CI.`,
 ✅ [7.x](https://github.com/elastic/kibana/pull/2) / https://github.com/elastic/kibana/pull/2
 ❌ 7.10: There was a merge conflict
 
-Successful backport PRs will be merged automatically after passing CI.
+The backport PRs will be merged automatically after passing CI.
 
 To backport manually, check out the target branch and run:
 \`node scripts/backport --pr 1\``,
@@ -61,7 +63,7 @@ To backport manually, check out the target branch and run:
     });
 
     it('should create a message for a all failed backports', async () => {
-      const comment = getCommentFromResponse(1, {
+      const comment = getCommentFromResponse(1, BACKPORT_TEMPLATE, {
         results: [
           {
             success: false,

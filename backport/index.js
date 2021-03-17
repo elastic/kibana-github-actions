@@ -13,16 +13,23 @@ exports.getConfig = async (repoOwner, repoName, branch) => {
     return resp.data;
 };
 async function backport() {
+    var _a;
     const { payload, repo } = github_1.context;
     if (!payload.pull_request) {
         throw Error('Only pull_request events are supported.');
     }
     const pullRequest = payload.pull_request;
     const owner = pullRequest.user.login;
-    const branch = core.getInput('branch', { required: true });
+    const branch = (_a = pullRequest === null || pullRequest === void 0 ? void 0 : pullRequest.base) === null || _a === void 0 ? void 0 : _a.ref;
+    if (!branch) {
+        throw Error("Can't determine PR base branch.");
+    }
     const accessToken = core.getInput('github_token', { required: true });
     const commitUser = core.getInput('commit_user', { required: true });
     const commitEmail = core.getInput('commit_email', { required: true });
+    const autoMerge = core.getInput('auto_merge', { required: true }) === 'true';
+    const autoMergeMethod = core.getInput('auto_merge_method', { required: true });
+    const backportCommandTemplate = core.getInput('manual_backport_command_template', { required: true });
     await exec_1.exec(`git config --global user.name "${commitUser}"`);
     await exec_1.exec(`git config --global user.email "${commitEmail}"`);
     const config = await exports.getConfig(repo.owner, repo.repo, branch);
@@ -35,14 +42,15 @@ async function backport() {
         pullNumber: pullRequest.number,
         labels: ['backport'],
         assignees: [owner],
-        autoMerge: true,
-        autoMergeMethod: 'squash',
+        autoMerge: autoMerge,
+        autoMergeMethod: autoMergeMethod,
     });
     await createStatusComment_1.default({
         accessToken,
         repoOwner: repo.owner,
         repoName: repo.repo,
         pullNumber: pullRequest.number,
+        backportCommandTemplate,
         backportResponse,
     });
 }
