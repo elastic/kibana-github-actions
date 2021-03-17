@@ -55,9 +55,9 @@ The backport PRs will be merged automatically after passing CI.`,
 ✅ [7.x](https://github.com/elastic/kibana/pull/2) / https://github.com/elastic/kibana/pull/2
 ❌ 7.10: There was a merge conflict
 
-The backport PRs will be merged automatically after passing CI.
+Successful backport PRs will be merged automatically after passing CI.
 
-To backport manually, check out the target branch and run:
+To backport manually run:
 \`node scripts/backport --pr 1\``,
       );
     });
@@ -85,7 +85,7 @@ To backport manually, check out the target branch and run:
 ❌ 7.x: There was a merge conflict
 ❌ 7.10: There was a merge conflict
 
-To backport manually, check out the target branch and run:
+To backport manually run:
 \`node scripts/backport --pr 1\``,
       );
     });
