@@ -3,7 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCommentFromResponse = void 0;
 const rest_1 = require("@octokit/rest");
 exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportResponse) => {
-    const hasAnySuccessful = !!backportResponse.results.find((r) => r.success);
+    const hasAnySuccessful = backportResponse.results.some((r) => r.success);
+    const hasAllSuccessful = backportResponse.results.every((r) => r.success);
     const header = backportResponse.success ? '## 💚 Backport successful' : '## 💔 Backport failed';
     const detailsList = backportResponse.results
         .map((result) => {
@@ -17,12 +18,20 @@ exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportR
         ? `The backport operation could not be completed due to the following error:\n${backportResponse.errorMessage}`
         : '';
     const helpParts = [];
-    if (hasAnySuccessful) {
+    if (hasAllSuccessful) {
+        if (backportResponse.results.length === 1) {
+            helpParts.push('This backport PR will be merged automatically after passing CI.');
+        }
+        else {
+            helpParts.push('The backport PRs will be merged automatically after passing CI.');
+        }
+    }
+    else if (hasAnySuccessful) {
         helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
     }
     if (!backportResponse.success) {
         helpParts.push([
-            'To backport manually, check out the target branch and run:',
+            'To backport manually run:',
             `\`${backportCommandTemplate.replace('%pullNumber%', pullNumber.toString())}\``,
         ].join('\n'));
     }
