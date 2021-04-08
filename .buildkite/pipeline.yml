@@ -4,6 +4,9 @@ env:
   SLACK_NOTIFICATIONS_CHANNEL: '#kb-bk'
   SLACK_NOTIFICATIONS_ENABLED: 'true'
 steps:
+  - label: 'Pre-Build'
+    command: .buildkite/pre-build.sh
+  - wait
   - label: 'Lint, Test, Build'
     command: .buildkite/ci.sh
     # plugins:
@@ -12,3 +15,7 @@ steps:
     #       workdir: /app
     #       propagate-uid-gid: true
     #       volumes: ['/.npm', '/.yarn']
+  - wait: ~
+    continue_on_failure: true
+  - label: 'Post-Build'
+    command: .buildkite/post-build.sh

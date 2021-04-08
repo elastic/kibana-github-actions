@@ -2,6 +2,9 @@ env:
   GITHUB_COMMIT_STATUS_ENABLED: 'true'
   GITHUB_COMMIT_STATUS_CONTEXT: 'buildkite'
 steps:
+  - label: 'Pre-Build'
+    command: .buildkite/pre-build.sh
+  - wait
   - label: 'Pull Request CI'
     command: .buildkite/pr.sh
     # plugins:
@@ -9,3 +12,8 @@ steps:
     #       image: 'node:14'
     #       workdir: /app
     #       propagate-uid-gid: true
+    #       volumes: ['/.npm', '/.yarn']
+  - wait: ~
+    continue_on_failure: true
+  - label: 'Post-Build'
+    command: .buildkite/post-build.sh
