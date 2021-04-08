@@ -2,14 +2,14 @@
 
 set -euxo pipefail
 
-echo '--- yarn install'
-yarn install
+echo '--- npm install'
+npm install
 
 echo '--- Lint'
-yarn lint
+npm run lint
 
 echo '--- Test'
-yarn test
+npm run test
 
 echo '--- Build'
-yarn build
+npm run build

@@ -5,6 +5,7 @@ steps:
   - label: 'Pull Request CI'
     command: .buildkite/pr.sh
     # plugins:
-    #   - docker#v3.2.0:
+    #   - docker#v3.8.0:
     #       image: 'node:14'
     #       workdir: /app
+    #       propagate-uid-gid: true
