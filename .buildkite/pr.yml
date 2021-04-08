@@ -4,7 +4,7 @@ env:
 steps:
   - label: 'Pull Request CI'
     command: .buildkite/pr.sh
-    plugins:
-      - docker#v3.2.0:
-          image: 'node:14'
-          workdir: /app
+    # plugins:
+    #   - docker#v3.2.0:
+    #       image: 'node:14'
+    #       workdir: /app
