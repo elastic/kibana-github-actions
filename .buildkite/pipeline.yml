@@ -1,0 +1,14 @@
+env:
+  GITHUB_COMMIT_STATUS_ENABLED: 'true'
+  GITHUB_COMMIT_STATUS_CONTEXT: 'buildkite'
+  SLACK_NOTIFICATIONS_CHANNEL: '#kb-bk'
+  SLACK_NOTIFICATIONS_ENABLED: 'true'
+steps:
+  - label: 'Lint, Test, Build'
+    command: .buildkite/ci.sh
+    # plugins:
+    #   - docker#v3.8.0:
+    #       image: 'node:14'
+    #       workdir: /app
+    #       propagate-uid-gid: true
+    #       volumes: ['/.npm', '/.yarn']

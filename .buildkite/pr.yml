@@ -1,0 +1,11 @@
+env:
+  GITHUB_COMMIT_STATUS_ENABLED: 'true'
+  GITHUB_COMMIT_STATUS_CONTEXT: 'buildkite'
+steps:
+  - label: 'Pull Request CI'
+    command: .buildkite/pr.sh
+    # plugins:
+    #   - docker#v3.8.0:
+    #       image: 'node:14'
+    #       workdir: /app
+    #       propagate-uid-gid: true
