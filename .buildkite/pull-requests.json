@@ -1,0 +1,18 @@
+{
+  "jobs": [
+    {
+      "repoOwner": "elastic",
+      "repoName": "kibana-github-actions",
+      "pipelineSlug": "kibana-github-actions-pr",
+
+      "enabled": true,
+      "target_branch": "main",
+      "allow_org_users": true,
+      "allowed_repo_permissions": ["admin", "write"],
+      "allowed_list": ["brianseeders"],
+      "cancel_in_progress_builds_on_update": true,
+      "set_commit_status": true,
+      "commit_status_context": "buildkite"
+    }
+  ]
+}
