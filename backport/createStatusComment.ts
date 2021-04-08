@@ -13,7 +13,7 @@ export const getCommentFromResponse = (
 
   const header = backportResponse.success ? '## 💚 Backport successful' : '## 💔 Backport failed';
 
-  const tableHeader = `| Status | Branch | Result |\n|:------:|:------:|:------:|`;
+  const tableHeader = `| Status | Branch | Result |\n|:------:|:------:|:------:|\n`;
   const tableBody = backportResponse.results
     .map((result) => {
       // this is gross - `result` should include the pullNumber
@@ -27,7 +27,7 @@ export const getCommentFromResponse = (
     })
     .join('\n');
 
-  const table = tableHeader + tableBody;
+  const table = backportResponse.results?.length ? tableHeader + tableBody : '';
 
   const generalErrorMessage =
     'errorMessage' in backportResponse

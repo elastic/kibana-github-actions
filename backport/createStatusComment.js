@@ -3,10 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCommentFromResponse = void 0;
 const rest_1 = require("@octokit/rest");
 exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportResponse, repoOwner, repoName) => {
+    var _a;
     const hasAnySuccessful = backportResponse.results.some((r) => r.success);
     const hasAllSuccessful = backportResponse.results.every((r) => r.success);
     const header = backportResponse.success ? '## 💚 Backport successful' : '## 💔 Backport failed';
-    const tableHeader = `| Status | Branch | Result |\n|:------:|:------:|:------:|`;
+    const tableHeader = `| Status | Branch | Result |\n|:------:|:------:|:------:|\n`;
     const tableBody = backportResponse.results
         .map((result) => {
         var _a;
@@ -18,7 +19,7 @@ exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportR
         return `| ❌ |  ${result.targetBranch}  | ${result.errorMessage} |`;
     })
         .join('\n');
-    const table = tableHeader + tableBody;
+    const table = ((_a = backportResponse.results) === null || _a === void 0 ? void 0 : _a.length) ? tableHeader + tableBody : '';
     const generalErrorMessage = 'errorMessage' in backportResponse
         ? `The backport operation could not be completed due to the following error:\n${backportResponse.errorMessage}`
         : '';

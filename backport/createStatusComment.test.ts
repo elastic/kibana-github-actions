@@ -29,7 +29,7 @@ describe('createStatusComment', () => {
         'kibana',
       );
       expect(comment).to.eql(
-        '## 💚 Backport successful\n\n| Status | Branch | Result |\n|:------:|:------:|:------:|| ✅ |  [7.x](https://github.com/elastic/kibana/pull/2)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/2">](https://github.com/elastic/kibana/pull/2) |\n| ✅ |  [7.10](https://github.com/elastic/kibana/pull/3)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/3">](https://github.com/elastic/kibana/pull/3) |\n\nThe backport PRs will be merged automatically after passing CI.',
+        '## 💚 Backport successful\n\n| Status | Branch | Result |\n|:------:|:------:|:------:|\n| ✅ |  [7.x](https://github.com/elastic/kibana/pull/2)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/2">](https://github.com/elastic/kibana/pull/2) |\n| ✅ |  [7.10](https://github.com/elastic/kibana/pull/3)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/3">](https://github.com/elastic/kibana/pull/3) |\n\nThe backport PRs will be merged automatically after passing CI.',
       );
     });
 
@@ -57,7 +57,7 @@ describe('createStatusComment', () => {
       );
 
       expect(comment).to.eql(
-        '## 💔 Backport failed\n\n| Status | Branch | Result |\n|:------:|:------:|:------:|| ✅ |  [7.x](https://github.com/elastic/kibana/pull/2)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/2">](https://github.com/elastic/kibana/pull/2) |\n| ❌ |  7.10  | There was a merge conflict |\n\nSuccessful backport PRs will be merged automatically after passing CI.\n\nTo backport manually run:\n`node scripts/backport --pr 1`',
+        '## 💔 Backport failed\n\n| Status | Branch | Result |\n|:------:|:------:|:------:|\n| ✅ |  [7.x](https://github.com/elastic/kibana/pull/2)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/2">](https://github.com/elastic/kibana/pull/2) |\n| ❌ |  7.10  | There was a merge conflict |\n\nSuccessful backport PRs will be merged automatically after passing CI.\n\nTo backport manually run:\n`node scripts/backport --pr 1`',
       );
     });
 
@@ -85,7 +85,7 @@ describe('createStatusComment', () => {
       );
 
       expect(comment).to.eql(
-        '## 💔 Backport failed\n\n| Status | Branch | Result |\n|:------:|:------:|:------:|| ❌ |  7.x  | There was a merge conflict |\n| ❌ |  7.10  | There was a merge conflict |\n\nTo backport manually run:\n`node scripts/backport --pr 1`',
+        '## 💔 Backport failed\n\n| Status | Branch | Result |\n|:------:|:------:|:------:|\n| ❌ |  7.x  | There was a merge conflict |\n| ❌ |  7.10  | There was a merge conflict |\n\nTo backport manually run:\n`node scripts/backport --pr 1`',
       );
     });
   });
