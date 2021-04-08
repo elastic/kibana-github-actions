@@ -5,21 +5,29 @@ export const getCommentFromResponse = (
   pullNumber: number,
   backportCommandTemplate: string,
   backportResponse: BackportResponse,
+  repoOwner: string,
+  repoName: string,
 ): string => {
   const hasAnySuccessful = backportResponse.results.some((r) => r.success);
   const hasAllSuccessful = backportResponse.results.every((r) => r.success);
 
   const header = backportResponse.success ? '## 💚 Backport successful' : '## 💔 Backport failed';
 
-  const detailsList = backportResponse.results
+  const tableHeader = `| Status | Branch | Result |\n|:------:|:------:|:------:|`;
+  const tableBody = backportResponse.results
     .map((result) => {
+      // this is gross - `result` should include the pullNumber
+      const backportPullNumber = result.pullRequestUrl?.split('/')[6];
+
       if (result.success) {
-        return `✅ [${result.targetBranch}](${result.pullRequestUrl}) / ${result.pullRequestUrl}`;
+        return `| ✅ |  [${result.targetBranch}](${result.pullRequestUrl})  | [<img src="https://img.shields.io/github/pulls/detail/state/${repoOwner}/${repoName}/${backportPullNumber}">](${result.pullRequestUrl}) |`;
       }
 
-      return `❌ ${result.targetBranch}: ${result.errorMessage}`;
+      return `| ❌ |  ${result.targetBranch}  | ${result.errorMessage} |`;
     })
     .join('\n');
+
+  const table = tableHeader + tableBody;
 
   const generalErrorMessage =
     'errorMessage' in backportResponse
@@ -49,7 +57,7 @@ export const getCommentFromResponse = (
 
   const helpMessage = helpParts.join('\n\n');
 
-  return [header, detailsList, generalErrorMessage, helpMessage].filter((m) => m).join('\n\n');
+  return [header, table, generalErrorMessage, helpMessage].filter((m) => m).join('\n\n');
 };
 
 export default async function createStatusComment(options: {
@@ -70,6 +78,6 @@ export default async function createStatusComment(options: {
     owner: repoOwner,
     repo: repoName,
     issue_number: pullNumber,
-    body: getCommentFromResponse(pullNumber, backportCommandTemplate, backportResponse),
+    body: getCommentFromResponse(pullNumber, backportCommandTemplate, backportResponse, repoOwner, repoName),
   });
 }
