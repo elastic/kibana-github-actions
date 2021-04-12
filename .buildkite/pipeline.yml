@@ -9,12 +9,10 @@ steps:
   - wait
   - label: 'Lint, Test, Build'
     command: .buildkite/ci.sh
-    # plugins:
-    #   - docker#v3.8.0:
-    #       image: 'node:14'
-    #       workdir: /app
-    #       propagate-uid-gid: true
-    #       volumes: ['/.npm', '/.yarn']
+    plugins:
+      - docker#v3.8.0:
+          image: 'node:14'
+          workdir: /app
   - wait: ~
     continue_on_failure: true
   - label: 'Post-Build'
