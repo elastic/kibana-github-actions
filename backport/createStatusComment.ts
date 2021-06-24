@@ -7,6 +7,7 @@ export const getCommentFromResponse = (
   backportResponse: BackportResponse,
   repoOwner: string,
   repoName: string,
+  autoMerge: boolean,
 ): string => {
   const hasAnySuccessful = backportResponse.results.some((r) => r.success);
   const hasAllSuccessful = backportResponse.results.every((r) => r.success);
@@ -36,14 +37,16 @@ export const getCommentFromResponse = (
 
   const helpParts = [];
 
-  if (hasAllSuccessful) {
-    if (backportResponse.results.length === 1) {
-      helpParts.push('This backport PR will be merged automatically after passing CI.');
-    } else {
-      helpParts.push('The backport PRs will be merged automatically after passing CI.');
+  if (autoMerge) {
+    if (hasAllSuccessful) {
+      if (backportResponse.results.length === 1) {
+        helpParts.push('This backport PR will be merged automatically after passing CI.');
+      } else {
+        helpParts.push('The backport PRs will be merged automatically after passing CI.');
+      }
+    } else if (hasAnySuccessful) {
+      helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
     }
-  } else if (hasAnySuccessful) {
-    helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
   }
 
   if (!backportResponse.success) {
@@ -67,8 +70,17 @@ export default async function createStatusComment(options: {
   pullNumber: number;
   backportCommandTemplate: string;
   backportResponse: BackportResponse;
+  autoMerge: boolean;
 }) {
-  const { accessToken, repoOwner, repoName, pullNumber, backportCommandTemplate, backportResponse } = options;
+  const {
+    accessToken,
+    repoOwner,
+    repoName,
+    pullNumber,
+    backportCommandTemplate,
+    backportResponse,
+    autoMerge,
+  } = options;
 
   const octokit = new Octokit({
     auth: accessToken,
@@ -78,6 +90,13 @@ export default async function createStatusComment(options: {
     owner: repoOwner,
     repo: repoName,
     issue_number: pullNumber,
-    body: getCommentFromResponse(pullNumber, backportCommandTemplate, backportResponse, repoOwner, repoName),
+    body: getCommentFromResponse(
+      pullNumber,
+      backportCommandTemplate,
+      backportResponse,
+      repoOwner,
+      repoName,
+      autoMerge,
+    ),
   });
 }

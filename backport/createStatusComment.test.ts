@@ -27,6 +27,7 @@ describe('createStatusComment', () => {
         } as BackportResponse,
         'elastic',
         'kibana',
+        true,
       );
       expect(comment).to.eql(
         '## 💚 Backport successful\n\n| Status | Branch | Result |\n|:------:|:------:|:------:|\n| ✅ |  [7.x](https://github.com/elastic/kibana/pull/2)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/2">](https://github.com/elastic/kibana/pull/2) |\n| ✅ |  [7.10](https://github.com/elastic/kibana/pull/3)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/3">](https://github.com/elastic/kibana/pull/3) |\n\nThe backport PRs will be merged automatically after passing CI.',
@@ -54,6 +55,7 @@ describe('createStatusComment', () => {
         } as BackportResponse,
         'elastic',
         'kibana',
+        true,
       );
 
       expect(comment).to.eql(
@@ -82,10 +84,39 @@ describe('createStatusComment', () => {
         } as BackportResponse,
         'elastic',
         'kibana',
+        true,
       );
 
       expect(comment).to.eql(
         '## 💔 Backport failed\n\n| Status | Branch | Result |\n|:------:|:------:|:------:|\n| ❌ |  7.x  | There was a merge conflict |\n| ❌ |  7.10  | There was a merge conflict |\n\nTo backport manually run:\n`node scripts/backport --pr 1`',
+      );
+    });
+
+    it('should create a message for all successful backports and not include the auto-merge message', async () => {
+      const comment = getCommentFromResponse(
+        1,
+        BACKPORT_TEMPLATE,
+        {
+          results: [
+            {
+              success: true,
+              targetBranch: '7.x',
+              pullRequestUrl: 'https://github.com/elastic/kibana/pull/2',
+            },
+            {
+              success: true,
+              targetBranch: '7.10',
+              pullRequestUrl: 'https://github.com/elastic/kibana/pull/3',
+            },
+          ],
+          success: true,
+        } as BackportResponse,
+        'elastic',
+        'kibana',
+        false,
+      );
+      expect(comment).to.eql(
+        '## 💚 Backport successful\n\n| Status | Branch | Result |\n|:------:|:------:|:------:|\n| ✅ |  [7.x](https://github.com/elastic/kibana/pull/2)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/2">](https://github.com/elastic/kibana/pull/2) |\n| ✅ |  [7.10](https://github.com/elastic/kibana/pull/3)  | [<img src="https://img.shields.io/github/pulls/detail/state/elastic/kibana/3">](https://github.com/elastic/kibana/pull/3) |',
       );
     });
   });

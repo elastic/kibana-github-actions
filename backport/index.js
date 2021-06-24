@@ -52,6 +52,7 @@ async function backport() {
         pullNumber: pullRequest.number,
         backportCommandTemplate,
         backportResponse,
+        autoMerge,
     });
 }
 backport().catch((error) => {

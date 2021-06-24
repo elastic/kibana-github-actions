@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCommentFromResponse = void 0;
 const rest_1 = require("@octokit/rest");
-exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportResponse, repoOwner, repoName) => {
+exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportResponse, repoOwner, repoName, autoMerge) => {
     var _a;
     const hasAnySuccessful = backportResponse.results.some((r) => r.success);
     const hasAllSuccessful = backportResponse.results.every((r) => r.success);
@@ -24,16 +24,18 @@ exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportR
         ? `The backport operation could not be completed due to the following error:\n${backportResponse.errorMessage}`
         : '';
     const helpParts = [];
-    if (hasAllSuccessful) {
-        if (backportResponse.results.length === 1) {
-            helpParts.push('This backport PR will be merged automatically after passing CI.');
+    if (autoMerge) {
+        if (hasAllSuccessful) {
+            if (backportResponse.results.length === 1) {
+                helpParts.push('This backport PR will be merged automatically after passing CI.');
+            }
+            else {
+                helpParts.push('The backport PRs will be merged automatically after passing CI.');
+            }
         }
-        else {
-            helpParts.push('The backport PRs will be merged automatically after passing CI.');
+        else if (hasAnySuccessful) {
+            helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
         }
-    }
-    else if (hasAnySuccessful) {
-        helpParts.push('Successful backport PRs will be merged automatically after passing CI.');
     }
     if (!backportResponse.success) {
         helpParts.push([
@@ -45,7 +47,7 @@ exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportR
     return [header, table, generalErrorMessage, helpMessage].filter((m) => m).join('\n\n');
 };
 async function createStatusComment(options) {
-    const { accessToken, repoOwner, repoName, pullNumber, backportCommandTemplate, backportResponse } = options;
+    const { accessToken, repoOwner, repoName, pullNumber, backportCommandTemplate, backportResponse, autoMerge, } = options;
     const octokit = new rest_1.Octokit({
         auth: accessToken,
     });
@@ -53,7 +55,7 @@ async function createStatusComment(options) {
         owner: repoOwner,
         repo: repoName,
         issue_number: pullNumber,
-        body: exports.getCommentFromResponse(pullNumber, backportCommandTemplate, backportResponse, repoOwner, repoName),
+        body: exports.getCommentFromResponse(pullNumber, backportCommandTemplate, backportResponse, repoOwner, repoName, autoMerge),
     });
 }
 exports.default = createStatusComment;

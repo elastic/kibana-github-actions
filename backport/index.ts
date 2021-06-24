@@ -60,6 +60,7 @@ async function backport() {
     pullNumber: pullRequest.number,
     backportCommandTemplate,
     backportResponse,
+    autoMerge,
   });
 }
 
