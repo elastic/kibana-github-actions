@@ -7,9 +7,14 @@ const exec_1 = require("@actions/exec");
 const github_1 = require("@actions/github");
 const backport_1 = require("backport");
 const createStatusComment_1 = require("./createStatusComment");
-const getConfig = async (repoOwner, repoName, branch) => {
+exports.getConfig = async (repoOwner, repoName, branch, accessToken) => {
     const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/.backportrc.json`;
-    const resp = await axios_1.default.get(url);
+    const config = {
+        method: 'get',
+        url: url,
+        headers: { Authorization: `token ${accessToken}` },
+    };
+    const resp = await axios_1.default(config);
     return resp.data;
 };
 exports.getConfig = getConfig;
@@ -33,7 +38,7 @@ async function backport() {
     const backportCommandTemplate = core.getInput('manual_backport_command_template', { required: true });
     await exec_1.exec(`git config --global user.name "${commitUser}"`);
     await exec_1.exec(`git config --global user.email "${commitEmail}"`);
-    const config = await exports.getConfig(repo.owner, repo.repo, branch);
+    const config = await exports.getConfig(repo.owner, repo.repo, branch, accessToken);
     const backportResponse = await backport_1.run({
         ...config,
         accessToken,

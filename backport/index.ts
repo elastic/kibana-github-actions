@@ -1,13 +1,18 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import * as core from '@actions/core';
 import { exec } from '@actions/exec';
 import { context } from '@actions/github';
 import { run, ConfigOptions } from 'backport';
 import createStatusComment from './createStatusComment';
 
-export const getConfig = async (repoOwner: string, repoName: string, branch: string) => {
+export const getConfig = async (repoOwner: string, repoName: string, branch: string, accessToken: string) => {
   const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/.backportrc.json`;
-  const resp = await axios.get(url);
+  const config: AxiosRequestConfig = {
+    method: 'get',
+    url: url,
+    headers: { Authorization: `token ${accessToken}` },
+  };
+  const resp = await axios(config);
   return resp.data as ConfigOptions;
 };
 
@@ -38,7 +43,7 @@ async function backport() {
   await exec(`git config --global user.name "${commitUser}"`);
   await exec(`git config --global user.email "${commitEmail}"`);
 
-  const config = await getConfig(repo.owner, repo.repo, branch);
+  const config = await getConfig(repo.owner, repo.repo, branch, accessToken);
 
   const backportResponse = await run({
     ...config,
