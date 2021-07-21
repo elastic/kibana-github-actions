@@ -26,6 +26,11 @@ describe('fixGaps', () => {
       expect(labels).to.eql(['v7.14.0', 'v7.15.0']);
     });
 
+    it('should return two missing non-consecutive labels', () => {
+      const labels = getVersionLabelsToAdd(MOCK_CONFIG, prMock('v7.14.3', 'v7.12.3'));
+      expect(labels).to.eql(['v7.13.0', 'v7.15.0']);
+    });
+
     it('should return no missing labels', () => {
       const labels = getVersionLabelsToAdd(MOCK_CONFIG, prMock('v7.15.0', 'v8.0.0'));
       expect(labels).to.eql([]);

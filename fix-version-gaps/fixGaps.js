@@ -1,24 +1,24 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.fixGaps = exports.getCommentFromLabels = exports.getVersionLabelsToAdd = exports.getVersionsFromBackportConfig = exports.getHighestVersionsOnPr = void 0;
+exports.fixGaps = exports.getCommentFromLabels = exports.getVersionLabelsToAdd = exports.getVersionsFromBackportConfig = exports.getLowestVersionsOnPr = void 0;
 const rest_1 = require("@octokit/rest");
-function getHighestVersionsOnPr(pr) {
-    const highestVersionsOnPr = {};
+function getLowestVersionsOnPr(pr) {
+    const lowestVersionsOnPr = {};
     for (const label of pr.labels) {
         const matches = label.name.match(/^v([0-9.]+)$/);
         if (matches) {
             const [major, minor] = matches[1].split('.');
-            if (!highestVersionsOnPr[major]) {
-                highestVersionsOnPr[major] = minor;
+            if (!lowestVersionsOnPr[major]) {
+                lowestVersionsOnPr[major] = minor;
             }
-            else if (parseInt(highestVersionsOnPr[major], 10) < parseInt(minor, 10)) {
-                highestVersionsOnPr[major] = minor;
+            else if (parseInt(lowestVersionsOnPr[major], 10) > parseInt(minor, 10)) {
+                lowestVersionsOnPr[major] = minor;
             }
         }
     }
-    return highestVersionsOnPr;
+    return lowestVersionsOnPr;
 }
-exports.getHighestVersionsOnPr = getHighestVersionsOnPr;
+exports.getLowestVersionsOnPr = getLowestVersionsOnPr;
 function getVersionsFromBackportConfig(config) {
     const highestVersions = [];
     for (const label in config.branchLabelMapping) {
@@ -33,14 +33,16 @@ function getVersionsFromBackportConfig(config) {
 exports.getVersionsFromBackportConfig = getVersionsFromBackportConfig;
 function getVersionLabelsToAdd(config, pr) {
     const versionsFromBackportConfig = getVersionsFromBackportConfig(config);
-    const highestVersionsOnPr = getHighestVersionsOnPr(pr);
+    const lowestVersionsOnPr = getLowestVersionsOnPr(pr);
+    const allLabels = pr.labels.map((label) => label.name);
     const versionLabelsToAdd = [];
     for (const version of versionsFromBackportConfig) {
         const [major, minor] = version.split('.');
-        if (highestVersionsOnPr[major] && highestVersionsOnPr[major] !== minor) {
-            const nextVersion = parseInt(highestVersionsOnPr[major], 10) + 1;
-            for (let i = nextVersion; i <= parseInt(minor, 10); i++) {
-                versionLabelsToAdd.push(`v${major}.${i}.0`);
+        const nextVersion = parseInt(lowestVersionsOnPr[major], 10) + 1;
+        for (let i = nextVersion; i <= parseInt(minor, 10); i++) {
+            const label = `v${major}.${i}.0`;
+            if (!allLabels.find((labelToCheck) => labelToCheck.match(`^v${major}\\.${i}\\.`))) {
+                versionLabelsToAdd.push(label);
             }
         }
     }
