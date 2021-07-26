@@ -7,11 +7,12 @@ const exec_1 = require("@actions/exec");
 const github_1 = require("@actions/github");
 const backport_1 = require("backport");
 const createStatusComment_1 = require("./createStatusComment");
-exports.getConfig = async (repoOwner, repoName, branch) => {
+const getConfig = async (repoOwner, repoName, branch) => {
     const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/.backportrc.json`;
     const resp = await axios_1.default.get(url);
     return resp.data;
 };
+exports.getConfig = getConfig;
 async function backport() {
     var _a;
     const { payload, repo } = github_1.context;

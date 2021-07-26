@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCommentFromResponse = void 0;
 const rest_1 = require("@octokit/rest");
-exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportResponse, repoOwner, repoName, autoMerge) => {
+const getCommentFromResponse = (pullNumber, backportCommandTemplate, backportResponse, repoOwner, repoName, autoMerge) => {
     var _a;
     const hasAnySuccessful = backportResponse.results.some((r) => r.success);
     const hasAllSuccessful = backportResponse.results.every((r) => r.success);
@@ -46,6 +46,7 @@ exports.getCommentFromResponse = (pullNumber, backportCommandTemplate, backportR
     const helpMessage = helpParts.join('\n\n');
     return [header, table, generalErrorMessage, helpMessage].filter((m) => m).join('\n\n');
 };
+exports.getCommentFromResponse = getCommentFromResponse;
 async function createStatusComment(options) {
     const { accessToken, repoOwner, repoName, pullNumber, backportCommandTemplate, backportResponse, autoMerge, } = options;
     const octokit = new rest_1.Octokit({
