@@ -39,6 +39,7 @@ async function backport() {
   const autoMerge = core.getInput('auto_merge', { required: true }) === 'true';
   const autoMergeMethod = core.getInput('auto_merge_method', { required: true });
   const backportCommandTemplate = core.getInput('manual_backport_command_template', { required: true });
+  const targetPRLabels = core.getInput('target_pr_labels', { required: true }).split(',');
 
   await exec(`git config --global user.name "${commitUser}"`);
   await exec(`git config --global user.email "${commitEmail}"`);
@@ -52,7 +53,7 @@ async function backport() {
     username: commitUser,
     ci: true,
     pullNumber: pullRequest.number,
-    labels: ['backport'],
+    targetPRLabels: targetPRLabels,
     assignees: [owner],
     autoMerge: autoMerge,
     autoMergeMethod: autoMergeMethod,
