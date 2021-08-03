@@ -22,6 +22,10 @@ inputs:
     description: ''
     required: false
     default: 'node scripts/backport --pr %pullNumber%'
+  target_pr_labels:
+    description: 'Comma-separated list of additional labels to add to backport pull request'
+    required: false
+    default: 'backport'
 runs:
   using: 'node12'
   main: 'index.js'
