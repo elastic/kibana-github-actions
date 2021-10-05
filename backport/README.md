@@ -1,6 +1,8 @@
 # backport action
 
-Example usage:
+**Example usage**
+
+Create a file `/.github/workflows/backport.yml` with the following content:
 
 ```yml
 on:
