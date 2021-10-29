@@ -25,7 +25,7 @@ async function run() {
   const backportConfig = await getConfig(
     pullRequest.base.repo.owner.login,
     pullRequest.base.repo.name,
-    'master',
+    'main',
   );
 
   await fixGaps(accessToken, backportConfig, pullRequest);
