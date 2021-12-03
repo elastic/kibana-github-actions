@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "GitHub Actions used by Kibana",
   "scripts": {
-    "prepare": "husky install",
+    "postinstall": "[ \"$NODE_ENV\" = production ] && exit 0; husky install",
     "test": "mocha -r ts-node/register **/*.test.ts",
     "build": "tsc",
     "lint": "eslint -c .eslintrc --fix --ext .ts .",
