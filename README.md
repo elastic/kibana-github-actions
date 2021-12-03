@@ -8,7 +8,7 @@ Created using https://github.com/microsoft/vscode-github-triage-actions as a fou
 
 ## Requirements
 
-- node.js >= 14 and npm
+- node.js >= 16 and npm
 
 ## Getting Started
 
