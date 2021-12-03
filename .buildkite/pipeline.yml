@@ -12,7 +12,7 @@ steps:
     plugins:
       - docker#v3.8.0:
           image: 'node:16.13'
-          workdir: /app
+          workdir: /
           propagate-uid-gid: true
           volumes: ['/.npm', '/.yarn']
   - wait: ~
