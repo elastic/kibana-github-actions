@@ -3,12 +3,10 @@ import { context, getOctokit } from '@actions/github';
 
 async function run() {
   const username = core.getInput('username') || context.actor;
-  const response = await getOctokit(process.env.GITHUB_TOKEN || '').rest.repos.getCollaboratorPermissionLevel(
-    {
-      ...context.repo,
-      username,
-    },
-  );
+  const response = await getOctokit(core.getInput('token')).rest.repos.getCollaboratorPermissionLevel({
+    ...context.repo,
+    username,
+  });
 
   const userPermission = response.data.permission;
   const desiredPermission = core.getInput('permission');

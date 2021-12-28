@@ -7,6 +7,9 @@ inputs:
   permission:
     description: 'Permission to check for: read|write|admin'
     required: true
+  token:
+    description: 'Github token to use for the check'
+    required: true
 runs:
   using: 'node12'
   main: 'index.js'

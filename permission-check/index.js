@@ -4,7 +4,7 @@ const core = require("@actions/core");
 const github_1 = require("@actions/github");
 async function run() {
     const username = core.getInput('username') || github_1.context.actor;
-    const response = await github_1.getOctokit(process.env.GITHUB_TOKEN || '').rest.repos.getCollaboratorPermissionLevel({
+    const response = await github_1.getOctokit(core.getInput('token')).rest.repos.getCollaboratorPermissionLevel({
         ...github_1.context.repo,
         username,
     });
