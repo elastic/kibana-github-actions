@@ -1,0 +1,12 @@
+name: 'Repo Permission Check'
+description: 'Checks that a user has at least a given permission level on the repo'
+inputs:
+  username:
+    description: Username of the user to check, defaults to the user that initiated the workflow
+    required: false
+  permission:
+    description: 'Permission to check for: read|write|admin'
+    required: true
+runs:
+  using: 'node12'
+  main: 'index.js'
