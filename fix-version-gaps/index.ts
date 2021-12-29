@@ -1,14 +1,14 @@
 import axios from 'axios';
 import * as core from '@actions/core';
 import { context } from '@actions/github';
-import { ConfigOptions } from 'backport';
+import { ConfigFileOptions } from 'backport';
 import { PullRequestEvent } from '@octokit/webhooks-definitions/schema';
 import { fixGaps } from './fixGaps';
 
 export const getConfig = async (repoOwner: string, repoName: string, branch: string) => {
   const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/.backportrc.json`;
   const resp = await axios.get(url);
-  return resp.data as ConfigOptions;
+  return resp.data as ConfigFileOptions;
 };
 
 async function run() {

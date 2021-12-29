@@ -2,8 +2,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import * as core from '@actions/core';
 import { exec } from '@actions/exec';
 import { context } from '@actions/github';
-import { run, ConfigOptions } from 'backport';
-import createStatusComment from './createStatusComment';
+import { run, ConfigFileOptions } from 'backport';
 
 export const getConfig = async (repoOwner: string, repoName: string, branch: string, accessToken: string) => {
   const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/.backportrc.json`;
@@ -13,10 +12,10 @@ export const getConfig = async (repoOwner: string, repoName: string, branch: str
     headers: { Authorization: `token ${accessToken}` },
   };
   const resp = await axios(config);
-  return resp.data as ConfigOptions;
+  return resp.data as ConfigFileOptions;
 };
 
-async function backport() {
+async function init() {
   const { payload, repo } = context;
 
   if (!payload.pull_request) {
@@ -38,7 +37,6 @@ async function backport() {
 
   const autoMerge = core.getInput('auto_merge', { required: true }) === 'true';
   const autoMergeMethod = core.getInput('auto_merge_method', { required: true });
-  const backportCommandTemplate = core.getInput('manual_backport_command_template', { required: true });
   const targetPRLabels = core
     .getInput('target_pr_labels', { required: true })
     .split(',')
@@ -49,7 +47,7 @@ async function backport() {
 
   const config = await getConfig(repo.owner, repo.repo, branch, accessToken);
 
-  const backportResponse = await run({
+  await run({
     ...config,
     accessToken,
     fork: true,
@@ -61,19 +59,9 @@ async function backport() {
     autoMerge: autoMerge,
     autoMergeMethod: autoMergeMethod,
   });
-
-  await createStatusComment({
-    accessToken,
-    repoOwner: repo.owner,
-    repoName: repo.repo,
-    pullNumber: pullRequest.number,
-    backportCommandTemplate,
-    backportResponse,
-    autoMerge,
-  });
 }
 
-backport().catch((error) => {
+init().catch((error) => {
   console.error('An error occurred', error);
   core.setFailed(error.message);
 });
