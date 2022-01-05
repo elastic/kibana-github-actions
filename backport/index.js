@@ -41,11 +41,10 @@ async function init() {
     await (0, exec_1.exec)(`git config --global user.name "${commitUser}"`);
     await (0, exec_1.exec)(`git config --global user.email "${commitEmail}"`);
     const config = await (0, exports.getConfig)(repo.owner, repo.repo, branch, accessToken);
-    await (0, backport_1.run)({
+    await (0, backport_1.backportRun)({
         ...config,
         accessToken,
         fork: true,
-        username: commitUser,
         ci: true,
         pullNumber: pullRequest.number,
         targetPRLabels: targetPRLabels,

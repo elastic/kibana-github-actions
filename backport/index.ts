@@ -2,7 +2,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import * as core from '@actions/core';
 import { exec } from '@actions/exec';
 import { context } from '@actions/github';
-import { run, ConfigFileOptions } from 'backport';
+import { backportRun, ConfigFileOptions } from 'backport';
 
 export const getConfig = async (repoOwner: string, repoName: string, branch: string, accessToken: string) => {
   const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/.backportrc.json`;
@@ -47,11 +47,10 @@ async function init() {
 
   const config = await getConfig(repo.owner, repo.repo, branch, accessToken);
 
-  await run({
+  await backportRun({
     ...config,
     accessToken,
     fork: true,
-    username: commitUser,
     ci: true,
     pullNumber: pullRequest.number,
     targetPRLabels: targetPRLabels,
