@@ -19,8 +19,8 @@ async function run() {
     const accessToken = core.getInput('github_token', { required: true });
     const pullRequestPayload = payload;
     const pullRequest = pullRequestPayload.pull_request;
-    const backportConfig = await exports.getConfig(pullRequest.base.repo.owner.login, pullRequest.base.repo.name, 'main');
-    await fixGaps_1.fixGaps(accessToken, backportConfig, pullRequest);
+    const backportConfig = await (0, exports.getConfig)(pullRequest.base.repo.owner.login, pullRequest.base.repo.name, 'main');
+    await (0, fixGaps_1.fixGaps)(accessToken, backportConfig, pullRequest);
 }
 run().catch((error) => {
     console.error('An error occurred', error);
