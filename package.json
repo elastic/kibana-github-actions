@@ -26,7 +26,7 @@
     "@actions/github": "^5.0.0",
     "@octokit/rest": "^18.6.7",
     "axios": "^0.21.1",
-    "backport": "^6.1.2"
+    "backport": "^6.1.3"
   },
   "devDependencies": {
     "@octokit/webhooks-definitions": "^3.67.3",
