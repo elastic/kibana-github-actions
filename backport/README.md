@@ -1,4 +1,6 @@
-# backport action
+# Backport Github Action
+
+See [Backport documentation](https://github.com/sqren/backport) for all configuration options. 
 
 **Example usage**
 
@@ -38,12 +40,7 @@ jobs:
       - name: Run Backport
         uses: ./actions/backport
         with:
-          github_token: ${{secrets.KIBANAMACHINE_TOKEN}}
+          github_token: ${{secrets.GITHUB_TOKEN}}
           commit_user: <YOUR_USERNAME>
           commit_email: <YOUR_EMAIL>
-          auto_merge: 'true'
-          auto_merge_method: 'squash'
-          manual_backport_command_template: 'node scripts/backport --pr %pullNumber%'
 ```
-
-Borrows heavily from https://github.com/sqren/backport-github-action
