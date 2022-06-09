@@ -25,6 +25,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(require("@actions/core"));
 const github_1 = require("@actions/github");
+const backport_1 = require("backport");
 const backportTargets_1 = require("./backportTargets");
 const versions_1 = require("./versions");
 async function init() {
@@ -53,12 +54,11 @@ async function init() {
                 labels: [currentLabel],
             });
             const targets = (0, backportTargets_1.resolveTargets)(versions, pullRequest.labels.map((label) => label.name));
-            // await backportRun({
-            console.log('would backport with options', {
+            await (0, backport_1.backportRun)({
                 options: {
                     repoOwner: repo.owner,
                     repoName: repo.repo,
-                    // accessToken,
+                    accessToken,
                     interactive: false,
                     pullNumber: pullRequest.number,
                     assignees: [pullRequest.user.login],

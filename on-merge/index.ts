@@ -41,12 +41,11 @@ async function init() {
         pullRequest.labels.map((label) => label.name),
       );
 
-      // await backportRun({
-      console.log('would backport with options', {
+      await backportRun({
         options: {
           repoOwner: repo.owner,
           repoName: repo.repo,
-          // accessToken,
+          accessToken,
           interactive: false,
           pullNumber: pullRequest.number,
           assignees: [pullRequest.user.login],
