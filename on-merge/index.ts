@@ -49,6 +49,19 @@ async function init() {
           pullRequest.labels.map((label) => label.name),
         );
 
+        // versionLabelsToAdd is temporary until the new process is complete that adds the label AFTER the backport PR is merged
+        const versionLabelsToAdd = versions.all
+          .filter((version) => targets.includes(version.branch))
+          .map((version) => `v${version.version}`);
+
+        if (versionLabelsToAdd.length) {
+          await github.issues.addLabels({
+            ...context.repo,
+            issue_number: pullRequest.number,
+            labels: versionLabelsToAdd,
+          });
+        }
+
         await backportRun({
           options: {
             repoOwner: repo.owner,
