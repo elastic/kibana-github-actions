@@ -1,38 +1,85 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const core = require("@actions/core");
-const exec_1 = require("@actions/exec");
+const core = __importStar(require("@actions/core"));
 const github_1 = require("@actions/github");
 const backport_1 = require("backport");
+const backportTargets_1 = require("./backportTargets");
+const versions_1 = require("./versions");
 async function init() {
     const { payload, repo } = github_1.context;
     if (!payload.pull_request) {
         throw Error('Only pull_request events are supported.');
     }
-    const pullRequest = payload.pull_request;
-    const prAuthor = pullRequest.user.login;
     const accessToken = core.getInput('github_token', { required: true });
-    const commitUser = core.getInput('commit_user', { required: false });
-    const commitEmail = core.getInput('commit_email', { required: false });
-    const autoMerge = core.getInput('auto_merge', { required: false }) === 'true';
-    const autoMergeMethod = core.getInput('auto_merge_method', { required: false });
-    const targetPRLabels = core
-        .getInput('target_pr_labels', { required: false })
-        .split(',')
-        .map((label) => label.trim());
-    await (0, exec_1.exec)(`git config --global user.name "${commitUser}"`);
-    await (0, exec_1.exec)(`git config --global user.email "${commitEmail}"`);
-    await (0, backport_1.backportRun)({
-        repoOwner: repo.owner,
-        repoName: repo.repo,
-        accessToken,
-        ci: true,
-        pullNumber: pullRequest.number,
-        targetPRLabels: targetPRLabels,
-        assignees: [prAuthor],
-        autoMerge: autoMerge,
-        autoMergeMethod: autoMergeMethod,
+    const github = (0, github_1.getOctokit)(accessToken).rest;
+    const { data } = await github.repos.getContent({
+        ...github_1.context.repo,
+        ref: 'main',
+        path: 'versions.json',
     });
+    const json = Buffer.from(data.content, 'base64').toString();
+    const versionsRaw = JSON.parse(json);
+    const versions = (0, versions_1.parseVersions)(versionsRaw);
+    const pullRequestPayload = payload;
+    const pullRequest = pullRequestPayload.pull_request;
+    if (pullRequest.base.ref === 'main') {
+        const currentLabel = `v${versions.currentMinor.version}`;
+        if (!pullRequest.labels.find((label) => label.name === currentLabel)) {
+            await github.issues.addLabels({
+                ...github_1.context.repo,
+                issue_number: pullRequest.number,
+                labels: [currentLabel],
+            });
+            const targets = (0, backportTargets_1.resolveTargets)(versions, pullRequest.labels.map((label) => label.name));
+            await (0, backport_1.backportRun)({
+                options: {
+                    repoOwner: repo.owner,
+                    repoName: repo.repo,
+                    accessToken,
+                    interactive: false,
+                    pullNumber: pullRequest.number,
+                    assignees: [pullRequest.user.login],
+                    autoMerge: true,
+                    autoMergeMethod: 'squash',
+                    targetBranches: targets,
+                    publishStatusCommentOnFailure: true,
+                    publishStatusCommentOnSuccess: false,
+                },
+            });
+        }
+        // Add most recent version
+        // Resolve targets based on labels
+        // Create backport PRs
+        //   Only create status if error
+    }
+    else if (pullRequest.labels.some((label) => label.name === 'backport')) {
+        // Add version from upstream package.json label to original PR
+        // Leave status comment if final backport
+        //  Include note about recently-changed versions.json if it was changed in the last 24 hours
+    }
 }
 init().catch((error) => {
     console.error('An error occurred', error);
