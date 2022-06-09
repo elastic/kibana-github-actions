@@ -1,0 +1,12 @@
+name: 'On-Merge Action'
+description: 'Action intended to be run on all merged PRs. Handles automatic version labels and backports'
+inputs:
+  github_token:
+    description: An oauth token that will be used to create backport pull requests and perform other operations
+    required: true
+runs:
+  using: 'node16'
+  main: 'index.js'
+branding:
+  icon: git-branch
+  color: green

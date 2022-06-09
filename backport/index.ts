@@ -26,15 +26,17 @@ async function init() {
   await exec(`git config --global user.email "${commitEmail}"`);
 
   await backportRun({
-    repoOwner: repo.owner,
-    repoName: repo.repo,
-    accessToken,
-    ci: true,
-    pullNumber: pullRequest.number,
-    targetPRLabels: targetPRLabels,
-    assignees: [prAuthor],
-    autoMerge: autoMerge,
-    autoMergeMethod: autoMergeMethod,
+    options: {
+      repoOwner: repo.owner,
+      repoName: repo.repo,
+      accessToken,
+      interactive: false,
+      pullNumber: pullRequest.number,
+      targetPRLabels: targetPRLabels,
+      assignees: [prAuthor],
+      autoMerge: autoMerge,
+      autoMergeMethod: autoMergeMethod,
+    },
   });
 }
 
