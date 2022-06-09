@@ -47,28 +47,35 @@ async function init() {
     const pullRequest = pullRequestPayload.pull_request;
     if (pullRequest.base.ref === 'main') {
         const currentLabel = `v${versions.currentMinor.version}`;
-        if (!pullRequest.labels.find((label) => label.name === currentLabel)) {
+        if (!pullRequest.labels.some((label) => label.name === currentLabel)) {
             await github.issues.addLabels({
                 ...github_1.context.repo,
                 issue_number: pullRequest.number,
                 labels: [currentLabel],
             });
-            const targets = (0, backportTargets_1.resolveTargets)(versions, pullRequest.labels.map((label) => label.name));
-            await (0, backport_1.backportRun)({
-                options: {
-                    repoOwner: repo.owner,
-                    repoName: repo.repo,
-                    accessToken,
-                    interactive: false,
-                    pullNumber: pullRequest.number,
-                    assignees: [pullRequest.user.login],
-                    autoMerge: true,
-                    autoMergeMethod: 'squash',
-                    targetBranches: targets,
-                    publishStatusCommentOnFailure: true,
-                    publishStatusCommentOnSuccess: false,
-                },
-            });
+            if ([
+                'backport:prev-minor',
+                'backport:prev-major',
+                'backport:all-open',
+                'backport:auto-version', // temporary opt-in label
+            ].some((gateLabel) => pullRequest.labels.some((label) => label.name === gateLabel))) {
+                const targets = (0, backportTargets_1.resolveTargets)(versions, pullRequest.labels.map((label) => label.name));
+                await (0, backport_1.backportRun)({
+                    options: {
+                        repoOwner: repo.owner,
+                        repoName: repo.repo,
+                        accessToken,
+                        interactive: false,
+                        pullNumber: pullRequest.number,
+                        assignees: [pullRequest.user.login],
+                        autoMerge: true,
+                        autoMergeMethod: 'squash',
+                        targetBranches: targets,
+                        publishStatusCommentOnFailure: true,
+                        publishStatusCommentOnSuccess: false,
+                    },
+                });
+            }
         }
     }
     else if (pullRequest.labels.some((label) => label.name === 'backport')) {

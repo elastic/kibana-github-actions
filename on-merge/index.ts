@@ -29,33 +29,42 @@ async function init() {
 
   if (pullRequest.base.ref === 'main') {
     const currentLabel = `v${versions.currentMinor.version}`;
-    if (!pullRequest.labels.find((label) => label.name === currentLabel)) {
+    if (!pullRequest.labels.some((label) => label.name === currentLabel)) {
       await github.issues.addLabels({
         ...context.repo,
         issue_number: pullRequest.number,
         labels: [currentLabel],
       });
 
-      const targets = resolveTargets(
-        versions,
-        pullRequest.labels.map((label) => label.name),
-      );
+      if (
+        [
+          'backport:prev-minor',
+          'backport:prev-major',
+          'backport:all-open',
+          'backport:auto-version', // temporary opt-in label
+        ].some((gateLabel) => pullRequest.labels.some((label) => label.name === gateLabel))
+      ) {
+        const targets = resolveTargets(
+          versions,
+          pullRequest.labels.map((label) => label.name),
+        );
 
-      await backportRun({
-        options: {
-          repoOwner: repo.owner,
-          repoName: repo.repo,
-          accessToken,
-          interactive: false,
-          pullNumber: pullRequest.number,
-          assignees: [pullRequest.user.login],
-          autoMerge: true,
-          autoMergeMethod: 'squash',
-          targetBranches: targets,
-          publishStatusCommentOnFailure: true,
-          publishStatusCommentOnSuccess: false,
-        },
-      });
+        await backportRun({
+          options: {
+            repoOwner: repo.owner,
+            repoName: repo.repo,
+            accessToken,
+            interactive: false,
+            pullNumber: pullRequest.number,
+            assignees: [pullRequest.user.login],
+            autoMerge: true,
+            autoMergeMethod: 'squash',
+            targetBranches: targets,
+            publishStatusCommentOnFailure: true,
+            publishStatusCommentOnSuccess: false,
+          },
+        });
+      }
     }
   } else if (pullRequest.labels.some((label) => label.name === 'backport')) {
     // Add version from upstream package.json label to original PR
