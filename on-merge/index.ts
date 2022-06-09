@@ -1,10 +1,9 @@
 import * as core from '@actions/core';
-import { exec } from '@actions/exec';
 import { context, getOctokit } from '@actions/github';
 import { PullRequestEvent } from '@octokit/webhooks-definitions/schema';
 import { backportRun } from 'backport';
 import { resolveTargets } from './backportTargets';
-import { parseVersions, Versions } from './versions';
+import { parseVersions } from './versions';
 
 async function init() {
   const { payload, repo } = context;
@@ -42,11 +41,12 @@ async function init() {
         pullRequest.labels.map((label) => label.name),
       );
 
-      await backportRun({
+      // await backportRun({
+      console.log('would backport with options', {
         options: {
           repoOwner: repo.owner,
           repoName: repo.repo,
-          accessToken,
+          // accessToken,
           interactive: false,
           pullNumber: pullRequest.number,
           assignees: [pullRequest.user.login],
@@ -58,11 +58,6 @@ async function init() {
         },
       });
     }
-
-    // Add most recent version
-    // Resolve targets based on labels
-    // Create backport PRs
-    //   Only create status if error
   } else if (pullRequest.labels.some((label) => label.name === 'backport')) {
     // Add version from upstream package.json label to original PR
     // Leave status comment if final backport

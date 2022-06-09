@@ -25,7 +25,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(require("@actions/core"));
 const github_1 = require("@actions/github");
-const backport_1 = require("backport");
 const backportTargets_1 = require("./backportTargets");
 const versions_1 = require("./versions");
 async function init() {
@@ -54,11 +53,12 @@ async function init() {
                 labels: [currentLabel],
             });
             const targets = (0, backportTargets_1.resolveTargets)(versions, pullRequest.labels.map((label) => label.name));
-            await (0, backport_1.backportRun)({
+            // await backportRun({
+            console.log('would backport with options', {
                 options: {
                     repoOwner: repo.owner,
                     repoName: repo.repo,
-                    accessToken,
+                    // accessToken,
                     interactive: false,
                     pullNumber: pullRequest.number,
                     assignees: [pullRequest.user.login],
@@ -70,10 +70,6 @@ async function init() {
                 },
             });
         }
-        // Add most recent version
-        // Resolve targets based on labels
-        // Create backport PRs
-        //   Only create status if error
     }
     else if (pullRequest.labels.some((label) => label.name === 'backport')) {
         // Add version from upstream package.json label to original PR
