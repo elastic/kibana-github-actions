@@ -74,7 +74,7 @@ async function init() {
             autoMergeMethod: 'squash',
             targetBranches: targets,
             publishStatusCommentOnFailure: true,
-            publishStatusCommentOnSuccess: false,
+            publishStatusCommentOnSuccess: true, // this will flip to false once we have backport summaries implemented
           },
         });
       }
