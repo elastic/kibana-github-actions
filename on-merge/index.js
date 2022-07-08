@@ -53,40 +53,40 @@ async function init() {
                 issue_number: pullRequest.number,
                 labels: [currentLabel],
             });
-            if ([
-                'backport:prev-minor',
-                'backport:prev-major',
-                'backport:all-open',
-                'backport:auto-version', // temporary opt-in label
-            ].some((gateLabel) => pullRequest.labels.some((label) => label.name === gateLabel))) {
-                const targets = (0, backportTargets_1.resolveTargets)(versions, pullRequest.labels.map((label) => label.name));
-                // versionLabelsToAdd is temporary until the new process is complete that adds the label AFTER the backport PR is merged
-                const versionLabelsToAdd = versions.all
-                    .filter((version) => targets.includes(version.branch))
-                    .map((version) => `v${version.version}`);
-                if (versionLabelsToAdd.length) {
-                    await github.issues.addLabels({
-                        ...github_1.context.repo,
-                        issue_number: pullRequest.number,
-                        labels: versionLabelsToAdd,
-                    });
-                }
-                await (0, backport_1.backportRun)({
-                    options: {
-                        repoOwner: repo.owner,
-                        repoName: repo.repo,
-                        accessToken,
-                        interactive: false,
-                        pullNumber: pullRequest.number,
-                        assignees: [pullRequest.user.login],
-                        autoMerge: true,
-                        autoMergeMethod: 'squash',
-                        targetBranches: targets,
-                        publishStatusCommentOnFailure: true,
-                        publishStatusCommentOnSuccess: true, // this will flip to false once we have backport summaries implemented
-                    },
+        }
+        if ([
+            'backport:prev-minor',
+            'backport:prev-major',
+            'backport:all-open',
+            'backport:auto-version', // temporary opt-in label
+        ].some((gateLabel) => pullRequest.labels.some((label) => label.name === gateLabel))) {
+            const targets = (0, backportTargets_1.resolveTargets)(versions, pullRequest.labels.map((label) => label.name));
+            // versionLabelsToAdd is temporary until the new process is complete that adds the label AFTER the backport PR is merged
+            const versionLabelsToAdd = versions.all
+                .filter((version) => targets.includes(version.branch))
+                .map((version) => `v${version.version}`);
+            if (versionLabelsToAdd.length) {
+                await github.issues.addLabels({
+                    ...github_1.context.repo,
+                    issue_number: pullRequest.number,
+                    labels: versionLabelsToAdd,
                 });
             }
+            await (0, backport_1.backportRun)({
+                options: {
+                    repoOwner: repo.owner,
+                    repoName: repo.repo,
+                    accessToken,
+                    interactive: false,
+                    pullNumber: pullRequest.number,
+                    assignees: [pullRequest.user.login],
+                    autoMerge: true,
+                    autoMergeMethod: 'squash',
+                    targetBranches: targets,
+                    publishStatusCommentOnFailure: true,
+                    publishStatusCommentOnSuccess: true, // this will flip to false once we have backport summaries implemented
+                },
+            });
         }
     }
     else if (pullRequest.labels.some((label) => label.name === 'backport')) {
