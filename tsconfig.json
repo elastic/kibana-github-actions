@@ -8,7 +8,8 @@
     "resolveJsonModule": true,
     "sourceMap": true,
     "esModuleInterop": true,
-    "lib": ["es2020"]
+    "lib": ["es2020"],
+    "useUnknownInCatchVariables": false
   },
   "exclude": ["**/*.test.ts", "**/vm-filesystem/**"]
 }

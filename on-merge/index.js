@@ -64,6 +64,19 @@ async function init() {
         ].some((gateLabel) => (0, util_1.labelsContain)(pullRequest.labels, gateLabel))) {
             const targets = (0, backportTargets_1.resolveTargets)(versions, pullRequest.labels.map((label) => label.name));
             if (!(0, util_1.labelsContain)(pullRequest.labels, 'backport:skip') && targets.length) {
+                try {
+                    await github.pulls.update({
+                        ...repo,
+                        pull_number: pullRequest.number,
+                        body: `${pullRequest.body}\n\n<!--ONMERGE ${JSON.stringify({
+                            backportTargets: targets,
+                        })} ONMERGE-->`,
+                    });
+                }
+                catch (error) {
+                    console.error('An error occurred', error);
+                    core.setFailed(error.message);
+                }
                 await (0, backport_1.backportRun)({
                     options: {
                         repoOwner: repo.owner,

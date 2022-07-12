@@ -53,6 +53,18 @@ async function init() {
       );
 
       if (!labelsContain(pullRequest.labels, 'backport:skip') && targets.length) {
+        try {
+          await github.pulls.update({
+            ...repo,
+            pull_number: pullRequest.number,
+            body: `${pullRequest.body}\n\n<!--ONMERGE ${JSON.stringify({
+              backportTargets: targets,
+            })} ONMERGE-->`,
+          });
+        } catch (error) {
+          console.error('An error occurred', error);
+          core.setFailed(error.message);
+        }
         await backportRun({
           options: {
             repoOwner: repo.owner,
