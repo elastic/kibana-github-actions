@@ -27,6 +27,11 @@ describe('backportTargets', () => {
   });
 
   describe('resolveTargets', () => {
+    it('should resolve when no backport labels are present', () => {
+      const branches = resolveTargets(mockVersions, ['none']);
+      expect(branches).to.eql([]);
+    });
+
     it('should resolve prev-minor', () => {
       const branches = resolveTargets(mockVersions, ['backport:prev-minor']);
       expect(branches).to.eql(['8.4']);
