@@ -26,7 +26,7 @@
     "@actions/github": "^5.0.0",
     "@octokit/rest": "^18.6.7",
     "axios": "^0.21.1",
-    "backport": "^8.5.2",
+    "backport": "^8.8.0",
     "semver": "^7.3.7"
   },
   "devDependencies": {
