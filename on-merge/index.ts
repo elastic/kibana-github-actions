@@ -38,49 +38,39 @@ async function init() {
       });
     }
 
-    // TODO remove this gating when default is opt-in
-    if (
-      [
-        'backport:prev-minor',
-        'backport:prev-major',
-        'backport:all-open',
-        'backport:auto-version', // temporary opt-in label
-      ].some((gateLabel) => labelsContain(pullRequest.labels, gateLabel))
-    ) {
-      const targets = resolveTargets(
-        versions,
-        pullRequest.labels.map((label) => label.name),
-      );
+    const targets = resolveTargets(
+      versions,
+      pullRequest.labels.map((label) => label.name),
+    );
 
-      if (!labelsContain(pullRequest.labels, 'backport:skip') && targets.length) {
-        try {
-          await github.pulls.update({
-            ...repo,
-            pull_number: pullRequest.number,
-            body: `${pullRequest.body}\n\n<!--ONMERGE ${JSON.stringify({
-              backportTargets: targets,
-            })} ONMERGE-->`,
-          });
-        } catch (error) {
-          console.error('An error occurred', error);
-          core.setFailed(error.message);
-        }
-        await backportRun({
-          options: {
-            repoOwner: repo.owner,
-            repoName: repo.repo,
-            accessToken,
-            interactive: false,
-            pullNumber: pullRequest.number,
-            assignees: [pullRequest.user.login],
-            autoMerge: true,
-            autoMergeMethod: 'squash',
-            targetBranches: targets,
-            publishStatusCommentOnFailure: true,
-            publishStatusCommentOnSuccess: true, // TODO this will flip to false once we have backport summaries implemented
-          },
+    if (!labelsContain(pullRequest.labels, 'backport:skip') && targets.length) {
+      try {
+        await github.pulls.update({
+          ...repo,
+          pull_number: pullRequest.number,
+          body: `${pullRequest.body}\n\n<!--ONMERGE ${JSON.stringify({
+            backportTargets: targets,
+          })} ONMERGE-->`,
         });
+      } catch (error) {
+        console.error('An error occurred', error);
+        core.setFailed(error.message);
       }
+      await backportRun({
+        options: {
+          repoOwner: repo.owner,
+          repoName: repo.repo,
+          accessToken,
+          interactive: false,
+          pullNumber: pullRequest.number,
+          assignees: [pullRequest.user.login],
+          autoMerge: true,
+          autoMergeMethod: 'squash',
+          targetBranches: targets,
+          publishStatusCommentOnFailure: true,
+          publishStatusCommentOnSuccess: true, // TODO this will flip to false once we have backport summaries implemented
+        },
+      });
     }
   } else if (labelsContain(pullRequest.labels, 'backport')) {
     const prData = getPrBackportData(pullRequest.body);
