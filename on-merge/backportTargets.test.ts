@@ -47,6 +47,11 @@ describe('backportTargets', () => {
       expect(branches).to.eql(['7.17', '8.3', '8.4']);
     });
 
+    it('should resolve prev-MAJOR and add all branches', () => {
+      const branches = resolveTargets(mockVersions, ['backport:prev-MAJOR']);
+      expect(branches).to.eql(['7.17', '8.3', '8.4']);
+    });
+
     it('should resolve all-open and add all branches', () => {
       const branches = resolveTargets(mockVersions, ['backport:all-open']);
       expect(branches).to.eql(['7.17', '8.3', '8.4']);

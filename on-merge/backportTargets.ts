@@ -10,8 +10,10 @@ function getBranchesAfter(versions: VersionsParsed, version: string): string[] {
     .sort();
 }
 
-export function resolveTargets(versions: VersionsParsed, labels: string[]) {
+export function resolveTargets(versions: VersionsParsed, labelsOriginal: string[]) {
   const targets = new Set<string>();
+
+  const labels = labelsOriginal.map((label) => label.toLowerCase());
 
   if (labels.includes('backport:prev-minor')) {
     targets.add(versions.previousMinor.branch);

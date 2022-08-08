@@ -39,7 +39,7 @@ function getVersionLabel(artifactsApiVersions, version) {
 }
 exports.getVersionLabel = getVersionLabel;
 function labelsContain(labels, label) {
-    return labels.some((l) => l.name === label);
+    return labels.some((l) => l.name.toLowerCase() === label.toLowerCase());
 }
 exports.labelsContain = labelsContain;
 //# sourceMappingURL=util.js.map

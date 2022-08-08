@@ -54,5 +54,5 @@ export function getVersionLabel(artifactsApiVersions: ArtifactsApiVersions, vers
 }
 
 export function labelsContain(labels: { name: string }[], label: string) {
-  return labels.some((l) => l.name === label);
+  return labels.some((l) => l.name.toLowerCase() === label.toLowerCase());
 }
