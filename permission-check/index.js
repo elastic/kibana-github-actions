@@ -26,19 +26,52 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core = __importStar(require("@actions/core"));
 const github_1 = require("@actions/github");
 async function run() {
-    const username = core.getInput('username') || github_1.context.actor;
-    const response = await (0, github_1.getOctokit)(core.getInput('token')).rest.repos.getCollaboratorPermissionLevel({
-        ...github_1.context.repo,
-        username,
-    });
-    const userPermission = response.data.permission;
+    var _a;
     const desiredPermission = core.getInput('permission');
-    const perms = ['none', 'read', 'write', 'admin'];
-    if (perms.indexOf(desiredPermission) < 0) {
-        throw Error(`Invalid desired permission: ${desiredPermission}`);
+    const desiredTeamOptions = core.getInput('teams');
+    if (!desiredPermission && !desiredTeamOptions) {
+        throw Error('No "permission" or "team" options specified. At least one must be specified.');
     }
-    if (perms.indexOf(userPermission) < perms.indexOf(desiredPermission)) {
-        throw Error(`User '${username}' must have at least permission '${desiredPermission}', had ${userPermission}`);
+    const username = core.getInput('username') || github_1.context.actor;
+    const errors = [];
+    if (desiredPermission) {
+        const perms = ['none', 'read', 'write', 'admin'];
+        if (perms.indexOf(desiredPermission) < 0) {
+            throw Error(`Invalid desired permission: ${desiredPermission}`);
+        }
+        const response = await (0, github_1.getOctokit)(core.getInput('token')).rest.repos.getCollaboratorPermissionLevel({
+            ...github_1.context.repo,
+            username,
+        });
+        const userPermission = response.data.permission;
+        if (perms.indexOf(userPermission) < perms.indexOf(desiredPermission)) {
+            errors.push(`User '${username}' did not have at least permission '${desiredPermission}', had ${userPermission}`);
+        }
+        else {
+            return true;
+        }
+    }
+    if (desiredTeamOptions) {
+        const teamOptions = desiredTeamOptions.split(',').map((t) => t.trim().replace('@', ''));
+        for (const teamOption of teamOptions) {
+            try {
+                const response = await (0, github_1.getOctokit)(core.getInput('token')).rest.teams.getMembershipForUserInOrg({
+                    org: github_1.context.repo.owner,
+                    team_slug: teamOption,
+                    username: username,
+                });
+                if (((_a = response === null || response === void 0 ? void 0 : response.data) === null || _a === void 0 ? void 0 : _a.state) === 'active') {
+                    return true;
+                }
+            }
+            catch (ex) {
+                // 404 == not a member of the team
+            }
+        }
+        errors.push(`User '${username}' was not a member of any of the teams: ${teamOptions.join(', ')}`);
+    }
+    if (errors.length) {
+        throw Error(errors.join(' '));
     }
 }
 run().catch((error) => {

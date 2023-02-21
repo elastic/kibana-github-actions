@@ -5,8 +5,11 @@ inputs:
     description: Username of the user to check, defaults to the user that initiated the workflow
     required: false
   permission:
-    description: 'Permission to check for: read|write|admin'
-    required: true
+    description: 'Permission to check for: read|write|admin. Boolean OR with teams check.'
+    required: false
+  teams:
+    description: 'Comma-separated list of teams to use for membership permission check. Can omit @ from teams. Boolean OR with permission check.'
+    required: false
   token:
     description: 'Github token to use for the check'
     required: true
