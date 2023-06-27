@@ -1,0 +1,12 @@
+name: 'Auto-Approve Backport Action'
+description: 'Auto-approve backport pull requests, created by automation'
+inputs:
+  github_token:
+    description: An oauth token that will be used to create the backport pull requests and perform other operations
+    required: true
+runs:
+  using: 'node16'
+  main: 'index.js'
+branding:
+  icon: thumbs-up
+  color: green
