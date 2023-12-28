@@ -1,18 +1,23 @@
 {
   "jobs": [
     {
-      "repoOwner": "elastic",
-      "repoName": "kibana-github-actions",
-      "pipelineSlug": "kibana-github-actions-pr",
-
       "enabled": true,
-      "target_branch": "main",
+      "pipeline_slug": "kibana-github-actionst-pull-request",
       "allow_org_users": true,
-      "allowed_repo_permissions": ["admin", "write"],
-      "allowed_list": ["brianseeders"],
-      "cancel_in_progress_builds_on_update": true,
-      "set_commit_status": true,
-      "commit_status_context": "buildkite"
+      "allowed_repo_permissions": [
+        "admin",
+        "write"
+      ],
+      "build_on_commit": true,
+      "build_on_comment": true,
+      "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))",
+      "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))",
+      "skip_ci_labels": [
+        "skip-ci"
+      ],
+      "skip_ci_on_only_changed": [
+        "\\.md$"
+      ]
     }
   ]
 }

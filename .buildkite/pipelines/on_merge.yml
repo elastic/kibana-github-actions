@@ -1,0 +1,5 @@
+steps:
+  - label: Run Tests
+    command: .buildkite/scripts/test.sh
+    agents:
+      image: node:20-slim
