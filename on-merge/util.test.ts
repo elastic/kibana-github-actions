@@ -30,7 +30,7 @@ describe('util', () => {
   });
 
   describe('getVersionLabel', () => {
-    const mockVersions = ({ versions: ['1.0.0', '1.0.1-SNAPSHOT'] } as any) as ArtifactsApiVersions;
+    const mockVersions = { versions: ['1.0.0', '1.0.1-SNAPSHOT'] } as any as ArtifactsApiVersions;
 
     it('should not increment version for a snapshot version', () => {
       expect(getVersionLabel(mockVersions, '1.0.1')).to.eql('v1.0.1');
