@@ -14,20 +14,12 @@ export function resolveTargets(versions: VersionsParsed, labelsOriginal: string[
   const targets = new Set<string>();
 
   const labels = labelsOriginal.map((label) => label.toLowerCase());
-
   if (labels.includes('backport:prev-minor')) {
-    targets.add(versions.previousMinor.branch);
-  }
-
-  if (labels.includes('backport:current-major')) {
-    targets.add(versions.previousMinor.branch);
-    versions.others
-      .filter((version) => version.currentMajor)
-      .forEach((version) => targets.add(version.branch));
+    versions.previousMinor.forEach((version) => targets.add(version.branch));
   }
 
   if (labels.includes('backport:all-open') || labels.includes('backport:prev-major')) {
-    targets.add(versions.previousMinor.branch);
+    versions.previousMinor.forEach((version) => targets.add(version.branch));
     targets.add(versions.previousMajor.branch);
     versions.others.forEach((version) => targets.add(version.branch));
   }

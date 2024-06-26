@@ -18,7 +18,7 @@ export interface VersionBranch {
 
 export interface VersionsParsed {
   currentMinor: Version;
-  previousMinor: Version;
+  previousMinor: Version[];
   previousMajor: Version;
   others: Version[];
   all: Version[];
@@ -26,7 +26,7 @@ export interface VersionsParsed {
 
 export function parseVersions(versions: Versions): VersionsParsed {
   const currentMinor = versions.versions.find((version) => version.currentMinor);
-  const previousMinor = versions.versions.find((version) => version.previousMinor);
+  const previousMinor = versions.versions.filter((version) => version.previousMinor);
   const previousMajor = versions.versions.find((version) => version.previousMajor);
 
   if (!currentMinor) {
