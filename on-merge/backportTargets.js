@@ -13,10 +13,16 @@ function resolveTargets(versions, labelsOriginal) {
     const targets = new Set();
     const labels = labelsOriginal.map((label) => label.toLowerCase());
     if (labels.includes('backport:prev-minor')) {
-        versions.previousMinor.forEach((version) => targets.add(version.branch));
+        targets.add(versions.previousMinor.branch);
+    }
+    if (labels.includes('backport:current-major')) {
+        targets.add(versions.previousMinor.branch);
+        versions.others
+            .filter((version) => version.currentMajor)
+            .forEach((version) => targets.add(version.branch));
     }
     if (labels.includes('backport:all-open') || labels.includes('backport:prev-major')) {
-        versions.previousMinor.forEach((version) => targets.add(version.branch));
+        targets.add(versions.previousMinor.branch);
         targets.add(versions.previousMajor.branch);
         versions.others.forEach((version) => targets.add(version.branch));
     }
