@@ -15,13 +15,19 @@ function resolveTargets(versions, labelsOriginal) {
     if (labels.includes('backport:prev-minor')) {
         targets.add(versions.previousMinor.branch);
     }
+    if (labels.includes('backport:prev-major')) {
+        targets.add(versions.previousMajor.branch);
+        versions.others
+            .filter((version) => version.previousMajor)
+            .forEach((version) => targets.add(version.branch));
+    }
     if (labels.includes('backport:current-major')) {
         targets.add(versions.previousMinor.branch);
         versions.others
             .filter((version) => version.currentMajor)
             .forEach((version) => targets.add(version.branch));
     }
-    if (labels.includes('backport:all-open') || labels.includes('backport:prev-major')) {
+    if (labels.includes('backport:all-open')) {
         targets.add(versions.previousMinor.branch);
         targets.add(versions.previousMajor.branch);
         versions.others.forEach((version) => targets.add(version.branch));

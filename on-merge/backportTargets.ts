@@ -19,6 +19,13 @@ export function resolveTargets(versions: VersionsParsed, labelsOriginal: string[
     targets.add(versions.previousMinor.branch);
   }
 
+  if (labels.includes('backport:prev-major')) {
+    targets.add(versions.previousMajor.branch);
+    versions.others
+      .filter((version) => version.previousMajor)
+      .forEach((version) => targets.add(version.branch));
+  }
+
   if (labels.includes('backport:current-major')) {
     targets.add(versions.previousMinor.branch);
     versions.others
@@ -26,7 +33,7 @@ export function resolveTargets(versions: VersionsParsed, labelsOriginal: string[
       .forEach((version) => targets.add(version.branch));
   }
 
-  if (labels.includes('backport:all-open') || labels.includes('backport:prev-major')) {
+  if (labels.includes('backport:all-open')) {
     targets.add(versions.previousMinor.branch);
     targets.add(versions.previousMajor.branch);
     versions.others.forEach((version) => targets.add(version.branch));
