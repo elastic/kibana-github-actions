@@ -63,7 +63,7 @@ describe('backportTargets', () => {
     });
 
     it('should not fill in gaps from hard-coded version labels when using backport:version', () => {
-      const branches = resolveTargets(mockVersions, ['backport:version', 'v7.15.0', "v8.4.5"]);
+      const branches = resolveTargets(mockVersions, ['backport:version', 'v7.15.0', 'v8.4.5']);
       expect(branches).to.eql(['7.15', '8.4']);
     });
 
