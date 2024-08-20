@@ -67,6 +67,11 @@ describe('backportTargets', () => {
       expect(branches).to.eql(['7.15', '8.4']);
     });
 
+    it('should not fill in gaps from hard-coded version labels when using auto-backport', () => {
+      const branches = resolveTargets(mockVersions, ['auto-backport', 'v7.15.0', 'v8.4.5']);
+      expect(branches).to.eql(['7.15', '8.4']);
+    });
+
     it('should resolve hard-coded version labels and target labels', () => {
       const branches = resolveTargets(mockVersions, ['backport:prev-major', 'v8.5.0', 'v8.4.1', 'v7.17.1']);
       expect(branches).to.eql(['7.17', '8.3', '8.4']);

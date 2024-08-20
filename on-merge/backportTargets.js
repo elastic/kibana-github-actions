@@ -42,7 +42,7 @@ function resolveTargets(versions, labelsOriginal) {
         // if the hard-coded version is the same minor as the current minor, we should skip it, because it's `main`
         if (branch !== currentMinor) {
             targets.add(branch);
-            if (!labels.includes('backport:version')) {
+            if (!labels.includes('backport:version') && !labels.includes('auto-backport')) {
                 // Fill in gaps, e.g. if `v8.1.0` is specified, add everything that is currently open between 8.1 and <main>
                 getBranchesAfter(versions, version).forEach((branch) => targets.add(branch));
             }
