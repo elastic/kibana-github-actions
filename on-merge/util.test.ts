@@ -7,6 +7,11 @@ describe('util', () => {
       expect(getPrBackportData('')).to.eql(null);
     });
 
+    it('should return null when body is empty', () => {
+      expect(getPrBackportData(null)).to.eql(null);
+      expect(getPrBackportData(undefined)).to.eql(null);
+    });
+
     it('should parse backport data from body', () => {
       const body = `
       body
