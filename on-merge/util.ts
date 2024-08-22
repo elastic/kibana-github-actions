@@ -22,8 +22,8 @@ export async function getPrPackageVersion(
   return version;
 }
 
-export function getPrBackportData(prBody: string) {
-  const prDataMatch = prBody.match(/<!--BACKPORT (.*?) BACKPORT-->/s);
+export function getPrBackportData(prBody: string | undefined | null) {
+  const prDataMatch = prBody?.match(/<!--BACKPORT (.*?) BACKPORT-->/s);
   if (prDataMatch?.[1]) {
     const prDataJson = prDataMatch[1];
     const prData: Commit[] = JSON.parse(prDataJson);

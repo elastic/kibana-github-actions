@@ -19,7 +19,7 @@ async function getPrPackageVersion(github, repoOwner, repoName, ref) {
 }
 exports.getPrPackageVersion = getPrPackageVersion;
 function getPrBackportData(prBody) {
-    const prDataMatch = prBody.match(/<!--BACKPORT (.*?) BACKPORT-->/s);
+    const prDataMatch = prBody === null || prBody === void 0 ? void 0 : prBody.match(/<!--BACKPORT (.*?) BACKPORT-->/s);
     if (prDataMatch === null || prDataMatch === void 0 ? void 0 : prDataMatch[1]) {
         const prDataJson = prDataMatch[1];
         const prData = JSON.parse(prDataJson);
