@@ -14,12 +14,10 @@ function parseVersions(versions) {
     if (!previousMajor) {
         throw new Error('versions.json is missing previous major version information');
     }
-    const others = versions.versions.filter((version) => !version.currentMinor && !version.previousMinor && !version.previousMajor);
     const parsed = {
         currentMinor,
         previousMinor,
         previousMajor,
-        others,
         all: versions.versions,
     };
     return parsed;

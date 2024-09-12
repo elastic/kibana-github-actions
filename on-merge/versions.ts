@@ -20,7 +20,6 @@ export interface VersionsParsed {
   currentMinor: Version;
   previousMinor: Version;
   previousMajor: Version;
-  others: Version[];
   all: Version[];
 }
 
@@ -41,15 +40,10 @@ export function parseVersions(versions: Versions): VersionsParsed {
     throw new Error('versions.json is missing previous major version information');
   }
 
-  const others = versions.versions.filter(
-    (version) => !version.currentMinor && !version.previousMinor && !version.previousMajor,
-  );
-
   const parsed: VersionsParsed = {
     currentMinor,
     previousMinor,
     previousMajor,
-    others,
     all: versions.versions,
   };
 
