@@ -14,7 +14,6 @@ describe('backportTargets', () => {
         version: '7.17.1',
         previousMajor: true,
       },
-      others: [{ branch: '8.3', version: '8.3.15', currentMajor: true }],
       all: [],
     };
 
@@ -22,7 +21,8 @@ describe('backportTargets', () => {
       mockVersions.currentMinor,
       mockVersions.previousMinor,
       mockVersions.previousMajor,
-      ...mockVersions.others,
+      { branch: '8.3', version: '8.3.15', currentMajor: true },
+      { branch: '7.x', version: '7.17.2', previousMajor: true }
     ];
   });
 
@@ -44,12 +44,12 @@ describe('backportTargets', () => {
 
     it('should resolve prev-major', () => {
       const branches = resolveTargets(mockVersions, ['backport:prev-major']);
-      expect(branches).to.eql(['7.17']);
+      expect(branches).to.eql(['7.17', '7.x']);
     });
 
     it('should resolve all-open and add all branches', () => {
       const branches = resolveTargets(mockVersions, ['backport:all-open']);
-      expect(branches).to.eql(['7.17', '8.3', '8.4']);
+      expect(branches).to.eql(['7.17', '7.x', '8.3', '8.4']);
     });
 
     it('should resolve hard-coded version labels', () => {
@@ -59,7 +59,7 @@ describe('backportTargets', () => {
 
     it('should resolve fill in gaps from hard-coded version labels', () => {
       const branches = resolveTargets(mockVersions, ['v7.16.0']);
-      expect(branches).to.eql(['7.16', '7.17', '8.3', '8.4']);
+      expect(branches).to.eql(['7.16', '7.17', '7.x', '8.3', '8.4']);
     });
 
     it('should not fill in gaps from hard-coded version labels when using backport:version', () => {
@@ -74,7 +74,7 @@ describe('backportTargets', () => {
 
     it('should resolve hard-coded version labels and target labels', () => {
       const branches = resolveTargets(mockVersions, ['backport:prev-major', 'v8.5.0', 'v8.4.1', 'v7.17.1']);
-      expect(branches).to.eql(['7.17', '8.3', '8.4']);
+      expect(branches).to.eql(['7.17', '7.x', '8.3', '8.4']);
     });
 
     it('should resolve multiple labels for same branch and not duplicate', () => {
@@ -85,7 +85,7 @@ describe('backportTargets', () => {
         'v8.4.1',
         'v7.17.1',
       ]);
-      expect(branches).to.eql(['7.17', '8.3', '8.4']);
+      expect(branches).to.eql(['7.17', '7.x', '8.3', '8.4']);
     });
   });
 });
