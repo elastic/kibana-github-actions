@@ -22,7 +22,7 @@ describe('backportTargets', () => {
       mockVersions.previousMinor,
       mockVersions.previousMajor,
       { branch: '8.3', version: '8.3.15', currentMajor: true },
-      { branch: '7.x', version: '7.17.2', previousMajor: true }
+      { branch: '7.x', version: '7.17.2', previousMajor: true },
     ];
   });
 

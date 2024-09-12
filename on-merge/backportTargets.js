@@ -16,9 +16,7 @@ function resolveTargets(versions, labelsOriginal) {
         targets.add(versions.previousMinor.branch);
     }
     if (labels.includes('backport:prev-major')) {
-        versions.all
-            .filter((version) => version.previousMajor)
-            .forEach((version) => targets.add(version.branch));
+        versions.all.filter((version) => version.previousMajor).forEach((version) => targets.add(version.branch));
     }
     if (labels.includes('backport:current-major')) {
         versions.all
