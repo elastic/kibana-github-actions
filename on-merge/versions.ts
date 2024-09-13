@@ -23,6 +23,10 @@ export interface VersionsParsed {
   all: Version[];
 }
 
+export interface VersionMap {
+  [regex: string]: string;
+}
+
 export function parseVersions(versions: Versions): VersionsParsed {
   const currentMinor = versions.versions.find((version) => version.currentMinor);
   const previousMinor = versions.versions.find((version) => version.previousMinor);

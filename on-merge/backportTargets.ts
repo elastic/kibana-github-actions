@@ -1,4 +1,4 @@
-import { VersionsParsed } from './versions';
+import { VersionsParsed, VersionMap } from './versions';
 
 const semver = require('semver');
 
@@ -10,7 +10,7 @@ function getBranchesAfter(versions: VersionsParsed, version: string): string[] {
     .sort();
 }
 
-export function resolveTargets(versions: VersionsParsed, labelsOriginal: string[]) {
+export function resolveTargets(versions: VersionsParsed, versionMap: VersionMap, labelsOriginal: string[]) {
   const targets = new Set<string>();
 
   const labels = labelsOriginal.map((label) => label.toLowerCase());
@@ -38,21 +38,21 @@ export function resolveTargets(versions: VersionsParsed, labelsOriginal: string[
   labels
     .filter((label) => label.match(/^v[0-9]+\.[0-9]+\.[0-9]+$/))
     .forEach((label) => {
-      // v8.4.0 -> 8.4
-      const version = label.substring(1);
-      const branch = version.substring(0, label.lastIndexOf('.') - 1);
+      let branch = null;
+      for (const [regex, replacement] of Object.entries(versionMap)) {
+        const matcher = new RegExp(regex);
+        if (matcher.test(label)) {
+          branch = label.replace(matcher, replacement);
+          break;
+        }
+      }
 
-      const currentMinor = versions.currentMinor.version.substring(
-        0,
-        versions.currentMinor.version.lastIndexOf('.'),
-      );
-
-      // if the hard-coded version is the same minor as the current minor, we should skip it, because it's `main`
-      if (branch !== currentMinor) {
+      if (branch && branch !== 'main') {
         targets.add(branch);
 
         if (!labels.includes('backport:version') && !labels.includes('auto-backport')) {
           // Fill in gaps, e.g. if `v8.1.0` is specified, add everything that is currently open between 8.1 and <main>
+          const version = label.substring(1);
           getBranchesAfter(versions, version).forEach((branch) => targets.add(branch));
         }
       }
