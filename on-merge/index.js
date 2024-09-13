@@ -36,14 +36,22 @@ async function init() {
     }
     const accessToken = core.getInput('github_token', { required: true });
     const github = (0, github_1.getOctokit)(accessToken).rest;
-    const { data } = await github.repos.getContent({
+    const versionsConfig = await github.repos.getContent({
         ...github_1.context.repo,
         ref: 'main',
         path: 'versions.json',
     });
-    const json = Buffer.from(data.content, 'base64').toString();
-    const versionsRaw = JSON.parse(json);
+    const backportConfig = await github.repos.getContent({
+        ...github_1.context.repo,
+        ref: 'main',
+        path: '.backportrc.json',
+    });
+    const versionsJSON = Buffer.from(versionsConfig.data.content, 'base64').toString();
+    const backportJSON = Buffer.from(backportConfig.data.content, 'base64').toString();
+    const versionsRaw = JSON.parse(versionsJSON);
+    const backportRaw = JSON.parse(backportJSON);
     const versions = (0, versions_1.parseVersions)(versionsRaw);
+    const versionMap = (backportRaw === null || backportRaw === void 0 ? void 0 : backportRaw.backportLabelMapping) || {};
     const pullRequestPayload = payload;
     const pullRequest = pullRequestPayload.pull_request;
     if (pullRequest.base.ref === 'main') {
@@ -55,7 +63,7 @@ async function init() {
                 labels: [currentLabel],
             });
         }
-        const targets = (0, backportTargets_1.resolveTargets)(versions, pullRequest.labels.map((label) => label.name));
+        const targets = (0, backportTargets_1.resolveTargets)(versions, versionMap, pullRequest.labels.map((label) => label.name));
         if (!(0, util_1.labelsContain)(pullRequest.labels, 'backport:skip') && targets.length) {
             try {
                 await github.pulls.update({

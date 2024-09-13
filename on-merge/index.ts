@@ -16,14 +16,22 @@ async function init() {
   const accessToken = core.getInput('github_token', { required: true });
 
   const github = getOctokit(accessToken).rest;
-  const { data } = await github.repos.getContent({
+  const versionsConfig = await github.repos.getContent({
     ...context.repo,
     ref: 'main',
     path: 'versions.json',
   });
-  const json = Buffer.from((data as any).content, 'base64').toString();
-  const versionsRaw = JSON.parse(json);
+  const backportConfig = await github.repos.getContent({
+    ...context.repo,
+    ref: 'main',
+    path: '.backportrc.json',
+  });
+  const versionsJSON = Buffer.from((versionsConfig.data as any).content, 'base64').toString();
+  const backportJSON = Buffer.from((backportConfig.data as any).content, 'base64').toString();
+  const versionsRaw = JSON.parse(versionsJSON);
+  const backportRaw = JSON.parse(backportJSON);
   const versions = parseVersions(versionsRaw);
+  const versionMap = backportRaw?.backportLabelMapping || {};
 
   const pullRequestPayload = payload as PullRequestEvent;
   const pullRequest = pullRequestPayload.pull_request;
@@ -40,6 +48,7 @@ async function init() {
 
     const targets = resolveTargets(
       versions,
+      versionMap,
       pullRequest.labels.map((label) => label.name),
     );
 

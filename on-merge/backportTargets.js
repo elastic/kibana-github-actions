@@ -9,7 +9,7 @@ function getBranchesAfter(versions, version) {
         .map((v) => v.branch)
         .sort();
 }
-function resolveTargets(versions, labelsOriginal) {
+function resolveTargets(versions, versionMap, labelsOriginal) {
     const targets = new Set();
     const labels = labelsOriginal.map((label) => label.toLowerCase());
     if (labels.includes('backport:prev-minor')) {
@@ -31,15 +31,19 @@ function resolveTargets(versions, labelsOriginal) {
     labels
         .filter((label) => label.match(/^v[0-9]+\.[0-9]+\.[0-9]+$/))
         .forEach((label) => {
-        // v8.4.0 -> 8.4
-        const version = label.substring(1);
-        const branch = version.substring(0, label.lastIndexOf('.') - 1);
-        const currentMinor = versions.currentMinor.version.substring(0, versions.currentMinor.version.lastIndexOf('.'));
-        // if the hard-coded version is the same minor as the current minor, we should skip it, because it's `main`
-        if (branch !== currentMinor) {
+        let branch = null;
+        for (const [regex, replacement] of Object.entries(versionMap)) {
+            const matcher = new RegExp(regex);
+            if (matcher.test(label)) {
+                branch = label.replace(matcher, replacement);
+                break;
+            }
+        }
+        if (branch && branch !== 'main') {
             targets.add(branch);
             if (!labels.includes('backport:version') && !labels.includes('auto-backport')) {
                 // Fill in gaps, e.g. if `v8.1.0` is specified, add everything that is currently open between 8.1 and <main>
+                const version = label.substring(1);
                 getBranchesAfter(versions, version).forEach((branch) => targets.add(branch));
             }
         }
