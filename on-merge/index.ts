@@ -31,7 +31,7 @@ async function init() {
   const versionsRaw = JSON.parse(versionsJSON);
   const backportRaw = JSON.parse(backportJSON);
   const versions = parseVersions(versionsRaw);
-  const versionMap = backportRaw?.backportLabelMapping || {};
+  const versionMap = backportRaw?.branchLabelMapping || {};
 
   const pullRequestPayload = payload as PullRequestEvent;
   const pullRequest = pullRequestPayload.pull_request;
