@@ -66,6 +66,15 @@ async function init() {
         const targets = (0, backportTargets_1.resolveTargets)(versions, versionMap, pullRequest.labels.map((label) => label.name));
         if (!(0, util_1.labelsContain)(pullRequest.labels, 'backport:skip') && targets.length) {
             try {
+                let actionUrl = '';
+                if (process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
+                    actionUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+                }
+                await github.issues.createComment({
+                    ...repo,
+                    issue_number: pullRequest.number,
+                    body: `Starting backport for target branches: ${targets.join(',')}${actionUrl ? '\n\n' + actionUrl : ''}`,
+                });
                 await github.pulls.update({
                     ...repo,
                     pull_number: pullRequest.number,
