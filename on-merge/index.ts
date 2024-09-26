@@ -61,7 +61,7 @@ async function init() {
         await github.issues.createComment({
           ...repo,
           issue_number: pullRequest.number,
-          body: `Starting backport for target branches: ${targets.join(',')}${
+          body: `Starting backport for target branches: ${targets.join(', ')}${
             actionUrl ? '\n\n' + actionUrl : ''
           }`,
         });
