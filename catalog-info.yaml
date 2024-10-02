@@ -21,7 +21,7 @@ spec:
       repository: elastic/kibana-github-actions
       env:
         ELASTIC_SLACK_NOTIFICATIONS_ENABLED: 'true'
-        SLACK_NOTIFICATIONS_CHANNEL: '#kibana-operations-service-alerts'
+        SLACK_NOTIFICATIONS_CHANNEL: '#kibana-operations-alerts'
       pipeline_file: ".buildkite/pipelines/on_merge.yml"
       branch_configuration: main
       provider_settings:
