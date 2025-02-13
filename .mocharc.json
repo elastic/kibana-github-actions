@@ -1,5 +1,6 @@
 {
   "extension": ["ts"],
   "spec": "**/*.test.ts",
+  "ignore": ["**/node_modules/**"],
   "require": "@swc/register"
 }
