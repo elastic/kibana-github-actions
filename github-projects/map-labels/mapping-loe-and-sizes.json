@@ -1,0 +1,28 @@
+{
+  "loe:small": {
+    "Size": "🐇 Small"
+  },
+  "loe:medium": {
+    "Size": "🐄 Medium"
+  },
+  "loe:large": {
+    "Size": "🐙 Large"
+  },
+  "loe:x-large": {
+    "Size": "🐳 X-Large"
+  },
+  "loe:needs-research": null,
+  "impact:low": {
+    "Priority": "🟢 Low"
+  },
+  "impact:medium": {
+    "Priority": "🟡 Medium"
+  },
+  "impact:high": {
+    "Priority": "🟠 High"
+  },
+  "impact:critical": {
+    "Priority": "🔴 Critical"
+  },
+  "impact:needs-assessment": null
+}

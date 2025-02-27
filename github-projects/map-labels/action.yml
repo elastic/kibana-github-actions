@@ -1,0 +1,12 @@
+name: 'Map labels to fields'
+description: 'Maps attached labels to fields in the issue'
+inputs:
+  github_token:
+    description: The github token to use for project-related actions
+    required: true
+runs:
+  using: 'node20'
+  main: 'index.js'
+branding:
+  icon: link
+  color: orange
