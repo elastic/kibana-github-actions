@@ -2,7 +2,6 @@
 
 import { Octokit } from '@octokit/rest';
 
-const GITHUB_ORG = 'elastic';
 const MAX_BATCH_SIZE = 100;
 
 type GraphQLNodes<T> = {
@@ -92,9 +91,12 @@ export type UpdateFieldParams = {
   fieldName: string;
 };
 
-export const gqlGetProject = async (octokit: Octokit, { projectNumber }: { projectNumber: number }) => {
+export const gqlGetProject = async (
+  octokit: Octokit,
+  { projectNumber, owner }: { projectNumber: number; owner: string },
+) => {
   const query = `query{
-        organization(login: "${GITHUB_ORG}"){
+        organization(login: "${owner}"){
           projectV2(number: ${projectNumber}){
             id
             url
@@ -108,7 +110,11 @@ export const gqlGetProject = async (octokit: Octokit, { projectNumber }: { proje
 
 export const gqlGetIssuesForProject = async (
   octokit: Octokit,
-  { projectNumber, findIssueNumbers = [] }: { projectNumber: number; findIssueNumbers?: number[] },
+  {
+    projectNumber,
+    findIssueNumbers = [],
+    owner,
+  }: { projectNumber: number; findIssueNumbers?: number[]; owner: string },
   limitOptions?: {
     issueCount?: number;
     issueFieldCount?: number;
@@ -127,7 +133,7 @@ export const gqlGetIssuesForProject = async (
   while (nextPageExists) {
     const startCursor = issueStartCursor ? `"${issueStartCursor}"` : null; // null is needed for first page, but it cannot be a string
     const query = `query{
-        organization(login: "${GITHUB_ORG}"){
+        organization(login: "${owner}"){
           projectV2(number: ${projectNumber}){
             items(first: ${Math.min(issueCount, MAX_BATCH_SIZE)}, after: ${startCursor}) {
               pageInfo {
@@ -209,7 +215,7 @@ export const gqlGetIssuesForProject = async (
 
 export const gqlGetFieldOptions = (
   octokit: Octokit,
-  projectNumber: number,
+  { projectNumber, owner }: { projectNumber: number; owner: string },
   limitOptions?: {
     fieldCount?: number;
   },
@@ -217,7 +223,7 @@ export const gqlGetFieldOptions = (
   const { fieldCount = 10 } = limitOptions || {};
 
   return octokit.graphql<FieldOptions>(`query {
-    organization(login: "${GITHUB_ORG}") {
+    organization(login: "${owner}") {
       projectV2(number: ${projectNumber}) {
         fields(first: ${fieldCount}) {
           nodes {

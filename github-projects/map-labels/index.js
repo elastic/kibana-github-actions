@@ -126,9 +126,9 @@ async function main(args) {
     console.log(`Loading label mapping file ${mapping}`);
     const labelsToFields = loadMapping(mapping);
     console.log(`Requesting project ${owner}/${projectNumber} and its issues...`);
-    const projectAndFields = await (0, projectsGraphQL_1.gqlGetProject)(octokit, { projectNumber });
+    const projectAndFields = await (0, projectsGraphQL_1.gqlGetProject)(octokit, { projectNumber, owner });
     updateResults.projectUrl = projectAndFields.url;
-    const issuesInProject = await (0, projectsGraphQL_1.gqlGetIssuesForProject)(octokit, { projectNumber, findIssueNumbers: issueNumbers }, {
+    const issuesInProject = await (0, projectsGraphQL_1.gqlGetIssuesForProject)(octokit, { projectNumber, findIssueNumbers: issueNumbers, owner }, {
         issueCount: 1000, // This is the maximum - it will exit earlier if issues are found
     });
     console.log(`Filtering issues: ${all ? 'all' : issueNumbers.join(', ')}`);
@@ -138,6 +138,7 @@ async function main(args) {
         try {
             const updatedFields = await adjustSingleItemLabels(octokit, {
                 issueNode,
+                owner,
                 projectNumber,
                 projectId: projectAndFields.id,
                 mapping: labelsToFields,
@@ -183,7 +184,7 @@ function combineAndVerifyArgs(defaults, args) {
     return combinedArgs;
 }
 async function adjustSingleItemLabels(octokit, options) {
-    const { issueNode, projectNumber, projectId, dryRun, mapping } = options;
+    const { issueNode, projectNumber, projectId, mapping, owner, dryRun } = options;
     const { content: issue, id: itemId } = issueNode;
     const labels = issue.labels.nodes;
     const updatedFields = [];
@@ -197,7 +198,7 @@ async function adjustSingleItemLabels(octokit, options) {
         const value = fieldUpdate[fieldName];
         console.log('Finding option for value', { fieldName, value });
         // Get field id
-        const optionForValue = await getOptionIdForValue(octokit, { projectNumber, fieldName, value });
+        const optionForValue = await getOptionIdForValue(octokit, { projectNumber, fieldName, value, owner });
         if (!optionForValue) {
             continue;
         }
@@ -239,8 +240,8 @@ function verifyExpectedArgs(args) {
     }
 }
 let fieldLookup = {};
-async function populateFieldLookup(octokit, projectNumber) {
-    const fieldOptions = await (0, projectsGraphQL_1.gqlGetFieldOptions)(octokit, projectNumber);
+async function populateFieldLookup(octokit, projectOptions) {
+    const fieldOptions = await (0, projectsGraphQL_1.gqlGetFieldOptions)(octokit, projectOptions);
     const singleSelectFields = fieldOptions.organization.projectV2.fields.nodes.filter((f) => f.__typename === 'ProjectV2SingleSelectField');
     fieldLookup = singleSelectFields.reduce((acc, field) => {
         acc[field.name] = field;
@@ -250,9 +251,9 @@ async function populateFieldLookup(octokit, projectNumber) {
 }
 async function getOptionIdForValue(octokit, options) {
     var _a;
-    const { projectNumber, fieldName, value } = options;
+    const { fieldName, value } = options;
     if (Object.keys(fieldLookup).length === 0) {
-        await populateFieldLookup(octokit, projectNumber);
+        await populateFieldLookup(octokit, options);
     }
     const field = fieldLookup[fieldName];
     const optionId = (_a = field.options.find((o) => o.name === value)) === null || _a === void 0 ? void 0 : _a.id;

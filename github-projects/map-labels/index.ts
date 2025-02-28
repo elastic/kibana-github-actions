@@ -118,12 +118,12 @@ async function main(args: typeof parsedCliArgs) {
   const labelsToFields = loadMapping(mapping);
 
   console.log(`Requesting project ${owner}/${projectNumber} and its issues...`);
-  const projectAndFields = await gqlGetProject(octokit, { projectNumber });
+  const projectAndFields = await gqlGetProject(octokit, { projectNumber, owner });
   updateResults.projectUrl = projectAndFields.url;
 
   const issuesInProject = await gqlGetIssuesForProject(
     octokit,
-    { projectNumber, findIssueNumbers: issueNumbers },
+    { projectNumber, findIssueNumbers: issueNumbers, owner },
     {
       issueCount: 1000, // This is the maximum - it will exit earlier if issues are found
     },
@@ -137,6 +137,7 @@ async function main(args: typeof parsedCliArgs) {
     try {
       const updatedFields = await adjustSingleItemLabels(octokit, {
         issueNode,
+        owner,
         projectNumber,
         projectId: projectAndFields.id,
         mapping: labelsToFields,
@@ -184,6 +185,7 @@ function combineAndVerifyArgs(defaults: typeof argsFromInputs, args: typeof pars
 async function adjustSingleItemLabels(
   octokit: Octokit,
   options: {
+    owner: string;
     issueNode: IssueNode;
     projectNumber: number;
     projectId: string;
@@ -191,7 +193,7 @@ async function adjustSingleItemLabels(
     mapping: Record<string, { [fieldName: string]: string } | null>;
   },
 ) {
-  const { issueNode, projectNumber, projectId, dryRun, mapping } = options;
+  const { issueNode, projectNumber, projectId, mapping, owner, dryRun } = options;
   const { content: issue, id: itemId } = issueNode;
   const labels = issue.labels.nodes;
 
@@ -210,7 +212,7 @@ async function adjustSingleItemLabels(
     console.log('Finding option for value', { fieldName, value });
 
     // Get field id
-    const optionForValue = await getOptionIdForValue(octokit, { projectNumber, fieldName, value });
+    const optionForValue = await getOptionIdForValue(octokit, { projectNumber, fieldName, value, owner });
 
     if (!optionForValue) {
       continue;
@@ -269,8 +271,11 @@ function verifyExpectedArgs(
 }
 
 let fieldLookup: Record<string, SingleSelectField> = {};
-async function populateFieldLookup(octokit: Octokit, projectNumber: number) {
-  const fieldOptions = await gqlGetFieldOptions(octokit, projectNumber);
+async function populateFieldLookup(
+  octokit: Octokit,
+  projectOptions: { projectNumber: number; owner: string },
+) {
+  const fieldOptions = await gqlGetFieldOptions(octokit, projectOptions);
 
   const singleSelectFields = fieldOptions.organization.projectV2.fields.nodes.filter(
     (f) => f.__typename === 'ProjectV2SingleSelectField',
@@ -289,11 +294,11 @@ async function populateFieldLookup(octokit: Octokit, projectNumber: number) {
 
 async function getOptionIdForValue(
   octokit: Octokit,
-  options: { projectNumber: number; fieldName: string; value: string },
+  options: { projectNumber: number; fieldName: string; value: string; owner: string },
 ) {
-  const { projectNumber, fieldName, value } = options;
+  const { fieldName, value } = options;
   if (Object.keys(fieldLookup).length === 0) {
-    await populateFieldLookup(octokit, projectNumber);
+    await populateFieldLookup(octokit, options);
   }
 
   const field = fieldLookup[fieldName];
