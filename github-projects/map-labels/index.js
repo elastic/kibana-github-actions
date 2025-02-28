@@ -124,7 +124,7 @@ async function main(args) {
         issueCount: 1000, // This is the maximum - it will exit earlier if issues are found
     });
     console.log('Filtering issues: ' + all ? 'all' : issueNumbers.join(', '));
-    const targetIssues = all ? issuesInProject : filterIssues(issuesInProject, repo, issueNumbers);
+    const targetIssues = all ? issuesInProject : filterIssues(issuesInProject, issueNumbers, repo);
     for (const issueNode of targetIssues) {
         console.log(`Updating issue target: ${issueNode.content.url}...`);
         try {
@@ -144,7 +144,7 @@ async function main(args) {
     }
     return updateResults;
 }
-function filterIssues(issuesInProject, repo, issueNumbers) {
+function filterIssues(issuesInProject, issueNumbers, repo) {
     const targetIssues = issuesInProject.filter((issue) => {
         if (!repo) {
             return issueNumbers.includes(issue.content.number);
@@ -204,21 +204,18 @@ async function adjustSingleItemLabels(octokit, options) {
     }
 }
 function verifyExpectedArgs(args) {
-    const { owner, repo, projectNumber } = args;
+    const { owner, projectNumber, issueNumber, all, githubToken } = args;
     if (!owner) {
         throw new Error('Owner from context or args cannot be inferred, but is required');
-    }
-    if (!repo) {
-        throw new Error('Repo from context or args cannot be inferred, but is required');
     }
     if (!projectNumber) {
         throw new Error('Project number is required for a single issue update');
     }
-    if (!args.githubToken) {
+    if (!githubToken) {
         throw new Error('GitHub token is required for authentication');
     }
-    if (!args.issueNumber && !args.all) {
-        throw new Error('Either issue number or all issues must be specified');
+    if (!issueNumber && !all) {
+        throw new Error('Either "issueNumber" or "all" should be specified at once');
     }
 }
 let fieldLookup = {};

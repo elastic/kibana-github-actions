@@ -121,7 +121,7 @@ async function main(args: typeof parsedCliArgs) {
   );
 
   console.log('Filtering issues: ' + all ? 'all' : issueNumbers.join(', '));
-  const targetIssues = all ? issuesInProject : filterIssues(issuesInProject, repo, issueNumbers);
+  const targetIssues = all ? issuesInProject : filterIssues(issuesInProject, issueNumbers, repo);
 
   for (const issueNode of targetIssues) {
     console.log(`Updating issue target: ${issueNode.content.url}...`);
@@ -142,7 +142,7 @@ async function main(args: typeof parsedCliArgs) {
   return updateResults;
 }
 
-function filterIssues(issuesInProject: IssueNode[], repo: string, issueNumbers: number[]) {
+function filterIssues(issuesInProject: IssueNode[], issueNumbers: number[], repo: string | undefined) {
   const targetIssues = issuesInProject.filter((issue) => {
     if (!repo) {
       return issueNumbers.includes(issue.content.number);
@@ -220,7 +220,6 @@ async function adjustSingleItemLabels(
 function verifyExpectedArgs(
   args: Partial<{
     owner: string;
-    repo: string;
     projectNumber: number;
     githubToken: string;
     issueNumber: number[];
@@ -228,27 +227,23 @@ function verifyExpectedArgs(
   }>,
 ): asserts args is {
   owner: string;
-  repo: string;
   projectNumber: number;
   issueNumber: number[];
   githubToken: string;
   all: boolean;
 } {
-  const { owner, repo, projectNumber } = args;
+  const { owner, projectNumber, issueNumber, all, githubToken } = args;
   if (!owner) {
     throw new Error('Owner from context or args cannot be inferred, but is required');
-  }
-  if (!repo) {
-    throw new Error('Repo from context or args cannot be inferred, but is required');
   }
   if (!projectNumber) {
     throw new Error('Project number is required for a single issue update');
   }
-  if (!args.githubToken) {
+  if (!githubToken) {
     throw new Error('GitHub token is required for authentication');
   }
-  if (!args.issueNumber && !args.all) {
-    throw new Error('Either issue number or all issues must be specified');
+  if (!issueNumber && !all) {
+    throw new Error('Either "issueNumber" or "all" should be specified at once');
   }
 }
 
