@@ -111,7 +111,15 @@ async function main(args) {
     const combinedArgs = combineAndVerifyArgs(argsFromInputs, args);
     const { issueNumber, projectNumber, owner, repo, mapping, all, dryRun, githubToken } = combinedArgs;
     const issueNumbers = issueNumber || [];
-    const updateResults = { success: [], failure: [], projectUrl: '' };
+    const updateResults = {
+        success: [],
+        failure: [],
+        skipped: [],
+        projectUrl: '',
+    };
+    if (dryRun) {
+        console.log('Running in dry-run mode. No changes will be made.');
+    }
     const octokit = new rest_1.Octokit({
         auth: githubToken.trim(),
     });
@@ -123,19 +131,26 @@ async function main(args) {
     const issuesInProject = await (0, projectsGraphQL_1.gqlGetIssuesForProject)(octokit, { projectNumber, findIssueNumbers: issueNumbers }, {
         issueCount: 1000, // This is the maximum - it will exit earlier if issues are found
     });
-    console.log('Filtering issues: ' + all ? 'all' : issueNumbers.join(', '));
+    console.log(`Filtering issues: ${all ? 'all' : issueNumbers.join(', ')}`);
     const targetIssues = all ? issuesInProject : filterIssues(issuesInProject, issueNumbers, repo);
     for (const issueNode of targetIssues) {
         console.log(`Updating issue target: ${issueNode.content.url}...`);
         try {
-            await adjustSingleItemLabels(octokit, {
+            const updatedFields = await adjustSingleItemLabels(octokit, {
                 issueNode,
                 projectNumber,
                 projectId: projectAndFields.id,
                 mapping: labelsToFields,
                 dryRun,
             });
-            updateResults.success.push(issueNode);
+            if (updatedFields.length) {
+                console.log(`Updated fields: ${updatedFields.join(', ')}`);
+                updateResults.success.push(issueNode);
+            }
+            else {
+                console.log('No fields updated');
+                updateResults.skipped.push(issueNode);
+            }
         }
         catch (error) {
             console.error('Error updating issue', error);
@@ -171,6 +186,7 @@ async function adjustSingleItemLabels(octokit, options) {
     const { issueNode, projectNumber, projectId, dryRun, mapping } = options;
     const { content: issue, id: itemId } = issueNode;
     const labels = issue.labels.nodes;
+    const updatedFields = [];
     // Get fields for each mappable label
     for (const label of labels) {
         const fieldUpdate = mapping[label.name];
@@ -183,7 +199,6 @@ async function adjustSingleItemLabels(octokit, options) {
         // Get field id
         const optionForValue = await getOptionIdForValue(octokit, { projectNumber, fieldName, value });
         if (!optionForValue) {
-            console.warn(`Could not find option for field "${fieldName}" and value "${value}"`);
             continue;
         }
         // update field
@@ -201,7 +216,9 @@ async function adjustSingleItemLabels(octokit, options) {
         else {
             await (0, projectsGraphQL_1.gqlUpdateFieldValue)(octokit, updateParams);
         }
+        updatedFields.push(fieldName);
     }
+    return updatedFields;
 }
 function verifyExpectedArgs(args) {
     const { owner, projectNumber, issueNumber, all, githubToken } = args;
@@ -216,6 +233,9 @@ function verifyExpectedArgs(args) {
     }
     if (!issueNumber && !all) {
         throw new Error('Either "issueNumber" or "all" should be specified at once');
+    }
+    if ((issueNumber === null || issueNumber === void 0 ? void 0 : issueNumber.length) === 0 && !all) {
+        throw new Error('Either "issueNumber" or "all" must be specified');
     }
 }
 let fieldLookup = {};
@@ -235,10 +255,9 @@ async function getOptionIdForValue(octokit, options) {
         await populateFieldLookup(octokit, projectNumber);
     }
     const field = fieldLookup[fieldName];
-    console.log(`Trying to find mapping from ${value} to field options...`, field.options);
     const optionId = (_a = field.options.find((o) => o.name === value)) === null || _a === void 0 ? void 0 : _a.id;
     if (!optionId) {
-        console.warn(`Could not find option for field "${fieldName}" and value "${value}"`);
+        console.warn(`Could not find option for field "${fieldName}" and value "${value}"`, field.options);
         return null;
     }
     else {
@@ -265,14 +284,14 @@ function getIssueLinks(projectUrl, issue) {
 }
 main(parsedCliArgs)
     .then((results) => {
-    const { success, failure, projectUrl } = results;
+    const { success, failure, skipped, projectUrl } = results;
     if (failure.length) {
         console.warn('Some issues failed to update:', failure);
     }
     else {
         console.log('All issues updated successfully.');
     }
-    console.log(`Successfully updated ${success.length} issues in project ${projectUrl}`);
+    console.log(`Updated ${success.length} issues in project ${projectUrl} (${skipped.length} skipped)`);
     success.forEach((issue) => console.log(`\t- ${getIssueLinks(projectUrl, issue)}`));
     process.exit(0);
 })

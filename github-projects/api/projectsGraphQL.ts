@@ -186,7 +186,7 @@ export const gqlGetIssuesForProject = async (
       }
     });
 
-    if (findIssueNumbersSet.size === 0) {
+    if (findIssueNumbers.length && findIssueNumbersSet.size === 0) {
       console.log('Found all filtered issues');
       break;
     } else if (results.length >= issueCount) {

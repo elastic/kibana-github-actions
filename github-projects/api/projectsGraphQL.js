@@ -84,7 +84,7 @@ const gqlGetIssuesForProject = async (octokit, { projectNumber, findIssueNumbers
                 findIssueNumbersSet.delete(issue.content.number);
             }
         });
-        if (findIssueNumbersSet.size === 0) {
+        if (findIssueNumbers.length && findIssueNumbersSet.size === 0) {
             console.log('Found all filtered issues');
             break;
         }
