@@ -1,9 +1,32 @@
 name: 'Map labels to fields'
-description: 'Maps attached labels to fields in the issue'
+description: 'Maps attached labels to corresponding fields in the issue'
 inputs:
-  github_token:
+  github-token:
     description: The github token to use for project-related actions
     required: true
+    default: ${{ github.token }}
+  issue-number:
+    description: 'The target issue number(s) to update, comma separated'
+    required: false
+  all:
+    description: 'Update all issues in the project - exclusive with issue-number'
+    required: false
+  project-number:
+    description: 'The project number containing the issue(s)'
+    required: true
+  mapping:
+    description: 'The mapping file to use'
+    required: false
+    default: 'mapping-loe-and-sizes.json'
+  repo:
+    description: 'The repository containing the issues. (If missing, any issue with that number in the project will be updated)'
+    required: false
+  owner:
+    description: 'The owner of the repository'
+    required: false
+  dry-run:
+    description: 'Run the script without making changes'
+    required: false
 runs:
   using: 'node20'
   main: 'index.js'

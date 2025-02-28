@@ -1,5 +1,28 @@
 #!/usr/bin/env ts-node-script
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -8,6 +31,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const yargs_1 = __importDefault(require("yargs"));
+const core = __importStar(require("@actions/core"));
 const github_1 = require("@actions/github");
 const rest_1 = require("@octokit/rest");
 const projectsGraphQL_1 = require("../api/projectsGraphQL");
@@ -35,7 +59,6 @@ const argv = (0, yargs_1.default)(process.argv.slice(2))
     .option('projectNumber', {
     alias: 'p',
     type: 'number',
-    demandOption: true,
     describe: 'The project number containing the issue',
 })
     .option('mapping', {
@@ -43,7 +66,6 @@ const argv = (0, yargs_1.default)(process.argv.slice(2))
     type: 'string',
     describe: 'The mapping file to use',
     default: 'mapping-loe-and-sizes.json',
-    requiresArg: true,
 })
     .option('repo', {
     alias: 'r',
@@ -55,23 +77,42 @@ const argv = (0, yargs_1.default)(process.argv.slice(2))
     type: 'string',
     describe: 'The owner of the repository',
     default: github_1.context.repo.owner,
-    requiresArg: true,
 })
-    .option('github-token', {
+    .option('githubToken', {
     alias: 't',
     type: 'string',
     describe: 'The GitHub token to use for authentication',
+})
+    .option('dryRun', {
+    type: 'boolean',
+    describe: 'Run the script without making changes',
+    default: false,
 })
     .option('version', {
     hidden: true,
 })
     .help().argv;
+const token = (_a = (argv.githubToken || core.getInput('github-token') || process.env.GITHUB_TOKEN)) === null || _a === void 0 ? void 0 : _a.trim();
 const octokit = new rest_1.Octokit({
-    auth: (_a = (argv['github-token'] || process.env.GITHUB_TOKEN)) === null || _a === void 0 ? void 0 : _a.trim(),
+    auth: token,
 });
 async function main(args) {
-    verifyExpectedArgs(args);
-    const { issueNumber, projectNumber, owner, repo, mapping, all } = args;
+    const argsDefaults = {
+        owner: github_1.context.repo.owner,
+        repo: github_1.context.repo.repo,
+        projectNumber: core.getInput('project-number') ? parseInt(core.getInput('project-number')) : undefined,
+        issueNumber: core.getInput('issue-number')
+            ? core
+                .getInput('issue-number')
+                .split(',')
+                .map((n) => parseInt(n))
+            : [],
+        all: core.getInput('all') === 'true',
+        mapping: core.getInput('mapping') || 'mapping-loe-and-sizes.json',
+    };
+    const combinedArgs = { ...argsDefaults, ...args };
+    verifyExpectedArgs(combinedArgs);
+    const { issueNumber, projectNumber, owner, repo, mapping, all } = combinedArgs;
     const issueNumbers = issueNumber || [];
     console.log(`Loading label mapping file ${mapping}`);
     const labelsToFields = loadMapping(mapping);
@@ -100,21 +141,28 @@ async function main(args) {
     }
     const success = [];
     const failure = [];
-    for (const targetIssue of targetIssues) {
-        console.log(`Updating issue target: ${targetIssue.content.url}...`);
+    for (const issueNode of targetIssues) {
+        console.log(`Updating issue target: ${issueNode.content.url}...`);
         try {
             Math.random() < -1 ? process.exit(0) : process.exit(1);
-            await adjustSingleItemLabels(targetIssue, projectNumber, projectAndFields.id, labelsToFields);
-            success.push(targetIssue);
+            await adjustSingleItemLabels({
+                issueNode,
+                projectNumber,
+                projectId: projectAndFields.id,
+                mapping: labelsToFields,
+                dryRun: args.dryRun,
+            });
+            success.push(issueNode);
         }
         catch (error) {
             console.error('Error updating issue', error);
-            failure.push(targetIssue);
+            failure.push(issueNode);
         }
     }
     return { success, failure, project: projectAndFields };
 }
-async function adjustSingleItemLabels(issueNode, projectNumber, projectId, mapping) {
+async function adjustSingleItemLabels(options) {
+    const { issueNode, projectNumber, projectId, dryRun, mapping } = options;
     const { content: issue, id: itemId } = issueNode;
     const labels = issue.labels.nodes;
     // Get fields for each mappable label
@@ -134,13 +182,24 @@ async function adjustSingleItemLabels(issueNode, projectNumber, projectId, mappi
         }
         // update field
         console.log(`Updating field "${fieldName}" to "${value}" (${optionForValue.optionId})`);
-        await (0, projectsGraphQL_1.gqlUpdateFieldValue)(octokit, {
-            projectId,
-            itemId,
-            fieldId: optionForValue.fieldId,
-            optionId: optionForValue.optionId,
-            fieldName,
-        });
+        if (dryRun) {
+            console.log('Dry run: skipping update for parameters', {
+                projectId,
+                itemId,
+                fieldId: optionForValue.fieldId,
+                optionId: optionForValue.optionId,
+                fieldName,
+            });
+        }
+        else {
+            await (0, projectsGraphQL_1.gqlUpdateFieldValue)(octokit, {
+                projectId,
+                itemId,
+                fieldId: optionForValue.fieldId,
+                optionId: optionForValue.optionId,
+                fieldName,
+            });
+        }
     }
 }
 function verifyExpectedArgs(args) {

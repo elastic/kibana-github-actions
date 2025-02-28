@@ -37,31 +37,33 @@ export type FieldUpdateResult = {
   };
 };
 
+export type IssueNode = {
+  __typename: string;
+  id: string;
+  fullDatabaseId: number;
+  content: {
+    __typename: string;
+    id: string;
+    number: number;
+    title: string;
+    url: string;
+    resourcePath: string;
+    repository: {
+      name: string;
+      owner: {
+        id: string;
+      };
+    };
+    labels: GraphQLNodes<{
+      name: string;
+    }>;
+  };
+};
+
 export type ProjectIssuesResponse = {
   organization: {
     projectV2: {
-      items: GraphQLNodes<{
-        __typename: string;
-        id: string;
-        fullDatabaseId: number;
-        content: {
-          __typename: string;
-          id: string;
-          number: number;
-          title: string;
-          url: string;
-          resourcePath: string;
-          repository: {
-            name: string;
-            owner: {
-              id: string;
-            };
-          };
-          labels: GraphQLNodes<{
-            name: string;
-          }>;
-        };
-      }>;
+      items: GraphQLNodes<IssueNode>;
     };
   };
 };

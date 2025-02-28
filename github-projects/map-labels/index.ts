@@ -1,8 +1,9 @@
-#!/usr/bin/env ts-node-script
+#!/usr/bin/env ts-node
 
 import fs from 'fs';
 import path from 'path';
 import yargs from 'yargs';
+import * as core from '@actions/core';
 import { context } from '@actions/github';
 
 import { Octokit } from '@octokit/rest';
@@ -11,7 +12,7 @@ import {
   gqlGetIssuesForProject,
   gqlGetProject,
   gqlUpdateFieldValue,
-  ProjectIssuesResponse,
+  IssueNode,
   SingleSelectField,
 } from '../api/projectsGraphQL';
 import { URL, URLSearchParams } from 'url';
@@ -20,7 +21,7 @@ import { URL, URLSearchParams } from 'url';
  * This script should map labels to fields in a GitHub project board.
  * Since projects can exist outside of a repo, we need to pass in the owner and repo as arguments.
  */
-const argv = yargs(process.argv.slice(2))
+const parsedCliArgs = yargs(process.argv.slice(2))
   // Since there's no preamble, we'll add the description to the epilogue.
   .epilogue(
     'This script should map labels to fields in a GitHub project board.\n' +
@@ -41,7 +42,6 @@ const argv = yargs(process.argv.slice(2))
   .option('projectNumber', {
     alias: 'p',
     type: 'number',
-    demandOption: true,
     describe: 'The project number containing the issue',
   })
   .option('mapping', {
@@ -49,7 +49,6 @@ const argv = yargs(process.argv.slice(2))
     type: 'string',
     describe: 'The mapping file to use',
     default: 'mapping-loe-and-sizes.json',
-    requiresArg: true,
   })
   .option('repo', {
     alias: 'r',
@@ -62,33 +61,57 @@ const argv = yargs(process.argv.slice(2))
     type: 'string',
     describe: 'The owner of the repository',
     default: context.repo.owner,
-    requiresArg: true,
   })
-  .option('github-token', {
+  .option('githubToken', {
     alias: 't',
     type: 'string',
     describe: 'The GitHub token to use for authentication',
+  })
+  .option('dryRun', {
+    type: 'boolean',
+    describe: 'Run the script without making changes',
+    default: false,
   })
   .option('version', {
     hidden: true,
   })
   .help().argv;
 
-const octokit = new Octokit({
-  auth: (argv['github-token'] || process.env.GITHUB_TOKEN)?.trim(),
-});
+const argsFromInputs: Partial<typeof parsedCliArgs> = {
+  owner: context.repo.owner,
+  projectNumber: core.getInput('project-number') ? parseInt(core.getInput('project-number')) : undefined,
+  issueNumber: core.getInput('issue-number')
+    ? core
+        .getInput('issue-number')
+        .split(',')
+        .map((n) => parseInt(n))
+    : [],
+  all: core.getInput('all') === 'true',
+  mapping: core.getInput('mapping'),
+  githubToken: core.getInput('github-token') || process.env.GITHUB_TOKEN,
+};
 
-async function main(args: typeof argv) {
-  verifyExpectedArgs(args);
+/**
+ * Main function
+ */
+async function main(args: typeof parsedCliArgs) {
+  const combinedArgs = combineAndVerifyArgs(argsFromInputs, args);
 
-  const { issueNumber, projectNumber, owner, repo, mapping, all } = args;
+  const { issueNumber, projectNumber, owner, repo, mapping, all, dryRun, githubToken } = combinedArgs;
   const issueNumbers = issueNumber || [];
+  const updateResults = { success: [] as IssueNode[], failure: [] as IssueNode[], projectUrl: '' };
+
+  const octokit = new Octokit({
+    auth: githubToken.trim(),
+  });
 
   console.log(`Loading label mapping file ${mapping}`);
   const labelsToFields = loadMapping(mapping);
 
   console.log(`Requesting project ${owner}/${projectNumber} and its issues...`);
   const projectAndFields = await gqlGetProject(octokit, { projectNumber });
+  updateResults.projectUrl = projectAndFields.url;
+
   const issuesInProject = await gqlGetIssuesForProject(
     octokit,
     { projectNumber, findIssueNumbers: issueNumbers },
@@ -97,10 +120,31 @@ async function main(args: typeof argv) {
     },
   );
 
+  console.log('Filtering issues: ' + all ? 'all' : issueNumbers.join(', '));
+  const targetIssues = all ? issuesInProject : filterIssues(issuesInProject, repo, issueNumbers);
+
+  for (const issueNode of targetIssues) {
+    console.log(`Updating issue target: ${issueNode.content.url}...`);
+    try {
+      await adjustSingleItemLabels(octokit, {
+        issueNode,
+        projectNumber,
+        projectId: projectAndFields.id,
+        mapping: labelsToFields,
+        dryRun,
+      });
+      updateResults.success.push(issueNode);
+    } catch (error) {
+      console.error('Error updating issue', error);
+      updateResults.failure.push(issueNode);
+    }
+  }
+  return updateResults;
+}
+
+function filterIssues(issuesInProject: IssueNode[], repo: string, issueNumbers: number[]) {
   const targetIssues = issuesInProject.filter((issue) => {
-    if (all) {
-      return true;
-    } else if (!repo) {
+    if (!repo) {
       return issueNumbers.includes(issue.content.number);
     } else {
       return issueNumbers.includes(issue.content.number) && issue.content.repository.name === repo;
@@ -108,34 +152,31 @@ async function main(args: typeof argv) {
   });
 
   if (!targetIssues.length) {
-    console.error(`Could not find any update target(s) for ${owner}/${repo} issues: ${issueNumbers}`);
-    process.exit(1);
+    console.error(`Could not find any update target(s) in repo "${repo}" issues: ${issueNumbers}`);
+    throw new Error('No target issues found');
   } else {
     console.log(`Found ${targetIssues.length} target issue(s) for update`);
   }
+  return targetIssues;
+}
 
-  const success = [];
-  const failure = [];
-  for (const targetIssue of targetIssues) {
-    console.log(`Updating issue target: ${targetIssue.content.url}...`);
-    try {
-      Math.random() < -1 ? process.exit(0) : process.exit(1);
-      await adjustSingleItemLabels(targetIssue, projectNumber, projectAndFields.id, labelsToFields);
-      success.push(targetIssue);
-    } catch (error) {
-      console.error('Error updating issue', error);
-      failure.push(targetIssue);
-    }
-  }
-  return { success, failure, project: projectAndFields };
+function combineAndVerifyArgs(defaults: typeof argsFromInputs, args: typeof parsedCliArgs) {
+  const combinedArgs = { ...defaults, ...args };
+  verifyExpectedArgs(combinedArgs);
+  return combinedArgs;
 }
 
 async function adjustSingleItemLabels(
-  issueNode: ProjectIssuesResponse['organization']['projectV2']['items']['nodes'][0],
-  projectNumber: number,
-  projectId: string,
-  mapping: Record<string, { [fieldName: string]: string } | null>,
+  octokit: Octokit,
+  options: {
+    issueNode: IssueNode;
+    projectNumber: number;
+    projectId: string;
+    dryRun: boolean;
+    mapping: Record<string, { [fieldName: string]: string } | null>;
+  },
 ) {
+  const { issueNode, projectNumber, projectId, dryRun, mapping } = options;
   const { content: issue, id: itemId } = issueNode;
   const labels = issue.labels.nodes;
 
@@ -152,7 +193,7 @@ async function adjustSingleItemLabels(
     console.log('Finding option for value', { fieldName, value });
 
     // Get field id
-    const optionForValue = await getOptionIdForValue(projectNumber, fieldName, value);
+    const optionForValue = await getOptionIdForValue(octokit, { projectNumber, fieldName, value });
 
     if (!optionForValue) {
       console.warn(`Could not find option for field "${fieldName}" and value "${value}"`);
@@ -161,38 +202,58 @@ async function adjustSingleItemLabels(
 
     // update field
     console.log(`Updating field "${fieldName}" to "${value}" (${optionForValue.optionId})`);
-    await gqlUpdateFieldValue(octokit, {
+    const updateParams = {
       projectId,
       itemId,
       fieldId: optionForValue.fieldId,
       optionId: optionForValue.optionId,
       fieldName,
-    });
+    };
+    if (dryRun) {
+      console.log('Dry run: skipping update for parameters', updateParams);
+    } else {
+      await gqlUpdateFieldValue(octokit, updateParams);
+    }
   }
 }
 
-function verifyExpectedArgs(args: typeof argv) {
+function verifyExpectedArgs(
+  args: Partial<{
+    owner: string;
+    repo: string;
+    projectNumber: number;
+    githubToken: string;
+    issueNumber: number[];
+    all: boolean;
+  }>,
+): asserts args is {
+  owner: string;
+  repo: string;
+  projectNumber: number;
+  issueNumber: number[];
+  githubToken: string;
+  all: boolean;
+} {
   const { owner, repo, projectNumber } = args;
   if (!owner) {
-    console.error('Owner from context or args cannot be inferred, but is required');
-    process.exit(1);
+    throw new Error('Owner from context or args cannot be inferred, but is required');
   }
   if (!repo) {
-    console.error('Repo from context or args cannot be inferred, but is required');
-    process.exit(1);
+    throw new Error('Repo from context or args cannot be inferred, but is required');
   }
   if (!projectNumber) {
-    console.error('Project number is required for a single issue update');
-    process.exit(1);
+    throw new Error('Project number is required for a single issue update');
+  }
+  if (!args.githubToken) {
+    throw new Error('GitHub token is required for authentication');
   }
   if (!args.issueNumber && !args.all) {
-    console.error('Either issue number or all issues must be specified');
-    process.exit(1);
+    throw new Error('Either issue number or all issues must be specified');
   }
 }
 
 let fieldLookup: Record<string, SingleSelectField> = {};
-async function populateFieldLookup(projectNumber: number) {
+async function populateFieldLookup(octokit: Octokit, projectNumber: number) {
   const fieldOptions = await gqlGetFieldOptions(octokit, projectNumber);
 
   const singleSelectFields = fieldOptions.organization.projectV2.fields.nodes.filter(
@@ -210,9 +271,13 @@ async function populateFieldLookup(projectNumber: number) {
   console.log('Field lookup populated', fieldLookup);
 }
 
-async function getOptionIdForValue(projectNumber: number, fieldName: string, value: string) {
+async function getOptionIdForValue(
+  octokit: Octokit,
+  options: { projectNumber: number; fieldName: string; value: string },
+) {
+  const { projectNumber, fieldName, value } = options;
   if (Object.keys(fieldLookup).length === 0) {
-    await populateFieldLookup(projectNumber);
+    await populateFieldLookup(octokit, projectNumber);
   }
 
   const field = fieldLookup[fieldName];
@@ -236,10 +301,7 @@ function loadMapping(mappingName: string = 'mapping-loe-sizes.json') {
   return JSON.parse(mapping);
 }
 
-function getIssueLinks(
-  projectUrl: string,
-  issue: ProjectIssuesResponse['organization']['projectV2']['items']['nodes'][0],
-) {
+function getIssueLinks(projectUrl: string, issue: IssueNode) {
   const issueBodyUrl = issue.content.url;
 
   const search = new URLSearchParams();
@@ -252,19 +314,20 @@ function getIssueLinks(
   return `${issueBodyUrl} | ${issueRef}`;
 }
 
-main(argv)
+main(parsedCliArgs)
   .then((results) => {
-    const { success, failure, project } = results;
+    const { success, failure, projectUrl } = results;
     if (failure.length) {
       console.warn('Some issues failed to update:', failure);
     } else {
       console.log('All issues updated successfully.');
     }
-    console.log(`Successfully updated ${success.length} issues in project ${project.url}`);
-    success.forEach((issue) => console.log(`\t- ${getIssueLinks(project.url, issue)}`));
+    console.log(`Successfully updated ${success.length} issues in project ${projectUrl}`);
+    success.forEach((issue) => console.log(`\t- ${getIssueLinks(projectUrl, issue)}`));
     process.exit(0);
   })
   .catch((error) => {
     console.error(error);
+    core.setFailed(error.message);
     process.exit(1);
   });
