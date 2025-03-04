@@ -40,6 +40,14 @@ export type IssueNode = {
   __typename: string;
   id: string;
   fullDatabaseId: number;
+  fieldValues: GraphQLNodes<{
+    __typename: string;
+    field: {
+      name: string;
+    };
+    name: string;
+    optionId: string;
+  }>;
   content: {
     __typename: string;
     id: string;
@@ -150,6 +158,11 @@ export const gqlGetIssuesForProject = async (
                       __typename
                       name
                       optionId
+                      field {
+                        ... on ProjectV2SingleSelectField {
+                          name
+                        }
+                      }
                     }
                   }
                 }

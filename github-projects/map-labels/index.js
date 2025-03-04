@@ -203,6 +203,12 @@ async function adjustSingleItemLabels(octokit, options) {
         if (!optionForValue) {
             continue;
         }
+        // Check if the field is already set
+        const existingField = issueNode.fieldValues.nodes.find((field) => field.__typename === 'ProjectV2ItemFieldSingleSelectValue' && field.field.name === fieldName);
+        if (existingField) {
+            console.log(`Field "${fieldName}" is already set to "${value}" (${optionForValue.optionId}), skipping update`);
+            continue;
+        }
         // update field
         console.log(`Updating field "${fieldName}" to "${value}" (${optionForValue.optionId})`);
         const updateParams = {

@@ -44,6 +44,11 @@ const gqlGetIssuesForProject = async (octokit, { projectNumber, findIssueNumbers
                       __typename
                       name
                       optionId
+                      field {
+                        ... on ProjectV2SingleSelectField {
+                          name
+                        }
+                      }
                     }
                   }
                 }
