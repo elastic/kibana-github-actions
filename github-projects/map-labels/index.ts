@@ -89,6 +89,7 @@ const argsFromInputs: Partial<typeof parsedCliArgs> = {
   all: core.getInput('all') === 'true',
   mapping: core.getInput('mapping'),
   githubToken: core.getInput('github-token') || process.env.GITHUB_TOKEN,
+  dryRun: core.getInput('dry-run') === 'true',
 };
 
 /**
