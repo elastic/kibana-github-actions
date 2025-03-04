@@ -290,8 +290,10 @@ function getIssueLinks(projectUrl, issue) {
     issueRef.search = search.toString();
     return `${issueBodyUrl} | ${issueRef}`;
 }
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 main(parsedCliArgs)
-    .then((results) => {
+    .then(async (results) => {
+    await sleep(1000); // Wait for the last log to flush
     const { success, failure, skipped, projectUrl } = results;
     if (failure.length) {
         console.warn('Some issues failed to update:', failure);
