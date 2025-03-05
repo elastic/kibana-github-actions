@@ -17,7 +17,7 @@ inputs:
   mapping:
     description: 'The mapping file to use'
     required: false
-    default: 'mapping-loe-and-sizes.json'
+    default: 'mapping-sizes-and-impact.json'
   repo:
     description: 'The repository containing the issues. (If missing, any issue with that number in the project will be updated)'
     required: false

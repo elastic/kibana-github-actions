@@ -13,16 +13,16 @@
   },
   "loe:needs-research": null,
   "impact:low": {
-    "Priority": "🟢 Low"
+    "Impact": "Low"
   },
   "impact:medium": {
-    "Priority": "🟡 Medium"
+    "Impact": "Medium"
   },
   "impact:high": {
-    "Priority": "🟠 High"
+    "Impact": "High"
   },
   "impact:critical": {
-    "Priority": "🔴 Critical"
+    "Impact": "Critical"
   },
   "impact:needs-assessment": null
 }

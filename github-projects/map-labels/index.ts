@@ -17,6 +17,8 @@ import {
 } from '../api/projectsGraphQL';
 import { URL, URLSearchParams } from 'url';
 
+const DEFAULT_OWNER_ORG = 'elastic';
+
 /**
  * This script should map labels to fields in a GitHub project board.
  * Since projects can exist outside of a repo, we need to pass in the owner and repo as arguments.
@@ -48,7 +50,7 @@ const parsedCliArgs = yargs(process.argv.slice(2))
     alias: 'm',
     type: 'string',
     describe: 'The mapping file to use',
-    default: 'mapping-loe-and-sizes.json',
+    default: 'mapping-sizes-and-impact.json',
   })
   .option('repo', {
     alias: 'r',
@@ -60,7 +62,6 @@ const parsedCliArgs = yargs(process.argv.slice(2))
     alias: 'o',
     type: 'string',
     describe: 'The owner of the repository',
-    default: context.repo.owner,
   })
   .option('githubToken', {
     alias: 't',
@@ -78,7 +79,7 @@ const parsedCliArgs = yargs(process.argv.slice(2))
   .help().argv;
 
 const argsFromInputs: Partial<typeof parsedCliArgs> = {
-  owner: context.repo.owner,
+  owner: core.getInput('owner') || tryGetOwnerFromContext() || DEFAULT_OWNER_ORG,
   projectNumber: core.getInput('project-number') ? parseInt(core.getInput('project-number')) : undefined,
   issueNumber: core.getInput('issue-number')
     ? core
@@ -328,7 +329,7 @@ async function getOptionIdForValue(
   }
 }
 
-function loadMapping(mappingName: string = 'mapping-loe-sizes.json') {
+function loadMapping(mappingName: string) {
   const pathToMapping = path.join(__dirname, mappingName);
   const mapping = fs.readFileSync(pathToMapping, 'utf8');
   return JSON.parse(mapping);
@@ -345,6 +346,16 @@ function getIssueLinks(projectUrl: string, issue: IssueNode) {
   issueRef.search = search.toString();
 
   return `${issueBodyUrl} | ${issueRef}`;
+}
+
+function tryGetOwnerFromContext() {
+  try {
+    // Might throw if the context is not available
+    return context.repo.owner;
+  } catch (error) {
+    console.warn('Could not get owner from context: ', error.message);
+    return undefined;
+  }
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

@@ -35,6 +35,7 @@ const github_1 = require("@actions/github");
 const rest_1 = require("@octokit/rest");
 const projectsGraphQL_1 = require("../api/projectsGraphQL");
 const url_1 = require("url");
+const DEFAULT_OWNER_ORG = 'elastic';
 /**
  * This script should map labels to fields in a GitHub project board.
  * Since projects can exist outside of a repo, we need to pass in the owner and repo as arguments.
@@ -64,7 +65,7 @@ const parsedCliArgs = (0, yargs_1.default)(process.argv.slice(2))
     alias: 'm',
     type: 'string',
     describe: 'The mapping file to use',
-    default: 'mapping-loe-and-sizes.json',
+    default: 'mapping-sizes-and-impact.json',
 })
     .option('repo', {
     alias: 'r',
@@ -75,7 +76,6 @@ const parsedCliArgs = (0, yargs_1.default)(process.argv.slice(2))
     alias: 'o',
     type: 'string',
     describe: 'The owner of the repository',
-    default: github_1.context.repo.owner,
 })
     .option('githubToken', {
     alias: 't',
@@ -92,7 +92,7 @@ const parsedCliArgs = (0, yargs_1.default)(process.argv.slice(2))
 })
     .help().argv;
 const argsFromInputs = {
-    owner: github_1.context.repo.owner,
+    owner: core.getInput('owner') || tryGetOwnerFromContext() || DEFAULT_OWNER_ORG,
     projectNumber: core.getInput('project-number') ? parseInt(core.getInput('project-number')) : undefined,
     issueNumber: core.getInput('issue-number')
         ? core
@@ -275,7 +275,7 @@ async function getOptionIdForValue(octokit, options) {
         };
     }
 }
-function loadMapping(mappingName = 'mapping-loe-sizes.json') {
+function loadMapping(mappingName) {
     const pathToMapping = path_1.default.join(__dirname, mappingName);
     const mapping = fs_1.default.readFileSync(pathToMapping, 'utf8');
     return JSON.parse(mapping);
@@ -289,6 +289,16 @@ function getIssueLinks(projectUrl, issue) {
     const issueRef = new url_1.URL(projectUrl);
     issueRef.search = search.toString();
     return `${issueBodyUrl} | ${issueRef}`;
+}
+function tryGetOwnerFromContext() {
+    try {
+        // Might throw if the context is not available
+        return github_1.context.repo.owner;
+    }
+    catch (error) {
+        console.warn('Could not get owner from context: ', error.message);
+        return undefined;
+    }
 }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 main(parsedCliArgs)
