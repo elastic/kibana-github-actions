@@ -112,7 +112,7 @@ const gqlGetIssuesForProject = async (octokit, { projectNumber, findIssueNumbers
 };
 exports.gqlGetIssuesForProject = gqlGetIssuesForProject;
 const gqlGetFieldOptions = (octokit, { projectNumber, owner }, limitOptions) => {
-    const { fieldCount = 10 } = limitOptions || {};
+    const { fieldCount = 20 } = limitOptions || {};
     return octokit.graphql(`query {
     organization(login: "${owner}") {
       projectV2(number: ${projectNumber}) {

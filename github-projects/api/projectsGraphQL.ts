@@ -233,7 +233,7 @@ export const gqlGetFieldOptions = (
     fieldCount?: number;
   },
 ) => {
-  const { fieldCount = 10 } = limitOptions || {};
+  const { fieldCount = 20 } = limitOptions || {};
 
   return octokit.graphql<FieldOptions>(`query {
     organization(login: "${owner}") {

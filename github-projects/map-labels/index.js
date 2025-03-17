@@ -185,6 +185,7 @@ function combineAndVerifyArgs(defaults, args) {
     return combinedArgs;
 }
 async function adjustSingleItemLabels(octokit, options) {
+    var _a;
     const { issueNode, projectNumber, projectId, mapping, owner, dryRun } = options;
     const { content: issue, id: itemId } = issueNode;
     const labels = issue.labels.nodes;
@@ -206,7 +207,8 @@ async function adjustSingleItemLabels(octokit, options) {
         // Check if the field is already set
         const existingField = issueNode.fieldValues.nodes.find((field) => field.__typename === 'ProjectV2ItemFieldSingleSelectValue' && field.field.name === fieldName);
         if (existingField) {
-            console.log(`Field "${fieldName}" is already set to "${value}" (${optionForValue.optionId}), skipping update`);
+            const existingFieldValue = (_a = fieldLookup[fieldName]) === null || _a === void 0 ? void 0 : _a.options.find((e) => e.id === existingField.optionId);
+            console.log(`Field "${fieldName}" is already set to "${existingFieldValue === null || existingFieldValue === void 0 ? void 0 : existingFieldValue.name}" (${existingField.optionId}), skipping update`);
             continue;
         }
         // update field
@@ -263,6 +265,10 @@ async function getOptionIdForValue(octokit, options) {
         await populateFieldLookup(octokit, options);
     }
     const field = fieldLookup[fieldName];
+    if (!field) {
+        console.error(`Could not find field "${fieldName}" in project fields`);
+        return null;
+    }
     const optionId = (_a = field.options.find((o) => o.name === value)) === null || _a === void 0 ? void 0 : _a.id;
     if (!optionId) {
         console.warn(`Could not find option for field "${fieldName}" and value "${value}"`, field.options);

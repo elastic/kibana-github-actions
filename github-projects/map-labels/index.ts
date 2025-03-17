@@ -226,8 +226,10 @@ async function adjustSingleItemLabels(
     );
 
     if (existingField) {
+      const existingFieldValue = fieldLookup[fieldName]?.options.find((e) => e.id === existingField.optionId);
+
       console.log(
-        `Field "${fieldName}" is already set to "${value}" (${optionForValue.optionId}), skipping update`,
+        `Field "${fieldName}" is already set to "${existingFieldValue?.name}" (${existingField.optionId}), skipping update`,
       );
       continue;
     }
@@ -316,6 +318,10 @@ async function getOptionIdForValue(
   }
 
   const field = fieldLookup[fieldName];
+  if (!field) {
+    console.error(`Could not find field "${fieldName}" in project fields`);
+    return null;
+  }
   const optionId = field.options.find((o) => o.name === value)?.id;
 
   if (!optionId) {
