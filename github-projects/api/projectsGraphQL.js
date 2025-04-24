@@ -20,66 +20,68 @@ exports.gqlGetProject = gqlGetProject;
 const gqlGetIssuesForProject = async (octokit, { projectNumber, findIssueNumbers = [], owner, }, limitOptions) => {
     var _a, _b;
     const { issueCount = 20, issueFieldCount = 10, labelsCount = 10 } = limitOptions || {};
+    console.log(`Fetching ${Math.max(findIssueNumbers === null || findIssueNumbers === void 0 ? void 0 : findIssueNumbers.length, issueCount)} issues for project ${projectNumber}...`);
     const results = [];
     let issueStartCursor = (limitOptions === null || limitOptions === void 0 ? void 0 : limitOptions.issueStartCursor) || null;
     let nextPageExists = true;
     const findIssueNumbersSet = new Set(findIssueNumbers);
     while (nextPageExists) {
         const startCursor = issueStartCursor ? `"${issueStartCursor}"` : null; // null is needed for first page, but it cannot be a string
-        const query = `query{
-        organization(login: "${owner}"){
-          projectV2(number: ${projectNumber}){
-            items(first: ${Math.min(issueCount, MAX_BATCH_SIZE)}, after: ${startCursor}) {
-              pageInfo {
-                endCursor
-                hasNextPage
-              }
-              nodes {
+        const batchSize = Math.min(issueCount, MAX_BATCH_SIZE);
+        const query = `
+query {
+  organization(login: "${owner}") {
+    projectV2(number: ${projectNumber}) {
+      items(first: ${batchSize}, after: ${startCursor}, orderBy: { field: POSITION, direction: DESC }) {
+        pageInfo {
+          endCursor
+          hasNextPage
+        }
+        nodes {
+          __typename
+          id
+          fieldValues(first: ${issueFieldCount}) {
+            nodes {
+              __typename
+              ... on ProjectV2ItemFieldSingleSelectValue {
                 __typename
-                id
-                fieldValues(first: ${issueFieldCount}) {
-                  nodes {
-                    __typename
-                    ... on ProjectV2ItemFieldSingleSelectValue {
-                      __typename
-                      name
-                      optionId
-                      field {
-                        ... on ProjectV2SingleSelectField {
-                          name
-                        }
-                      }
-                    }
+                name
+                optionId
+                field {
+                  ... on ProjectV2SingleSelectField {
+                    name
                   }
                 }
-                fullDatabaseId
-                content {
-                  __typename
-                  ... on Issue {
-                    id
-                    number
-                    title
-                    resourcePath
-                    url
-                    repository {
-                      name
-                      owner {
-                        id
-                      }
-                    }
-                    labels(first: ${labelsCount}) {
-                      nodes {
-                        name
-                      }
-                    }
-                  }
+              }
+            }
+          }
+          fullDatabaseId
+          content {
+            __typename
+            ... on Issue {
+              id
+              number
+              title
+              resourcePath
+              url
+              repository {
+                name
+                owner {
+                  id
+                }
+              }
+              labels(first: ${labelsCount}) {
+                nodes {
+                  name
                 }
               }
             }
           }
         }
       }
-    `;
+    }
+  }
+}`;
         const responseItems = (await octokit.graphql(query)).organization.projectV2.items;
         const responseIssues = responseItems.nodes.filter((i) => { var _a; return ((_a = i.content) === null || _a === void 0 ? void 0 : _a.__typename) === 'Issue'; });
         results.push(...responseIssues);
@@ -97,6 +99,7 @@ const gqlGetIssuesForProject = async (octokit, { projectNumber, findIssueNumbers
             break;
         }
         else if ((_a = responseItems.pageInfo) === null || _a === void 0 ? void 0 : _a.hasNextPage) {
+            console.log(`Fetched ${results.length} of ${issueCount} issues, fetching more...`);
             nextPageExists = true;
             if (nextPageExists) {
                 issueStartCursor = ((_b = responseItems.pageInfo) === null || _b === void 0 ? void 0 : _b.endCursor) || null;

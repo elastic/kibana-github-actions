@@ -129,11 +129,15 @@ async function main(args) {
     console.log(`Requesting project ${owner}/${projectNumber} and its issues...`);
     const projectAndFields = await (0, projectsGraphQL_1.gqlGetProject)(octokit, { projectNumber, owner });
     updateResults.projectUrl = projectAndFields.url;
+    const hasFilter = (issueNumbers === null || issueNumbers === void 0 ? void 0 : issueNumbers.length) > 0;
+    // If we're requesting all issues, we should list ~1000 issues to max it out
+    // if we're not, we should be fine with the 50 most recent
+    const issueCount = hasFilter || all ? 1000 : 50;
     const issuesInProject = await (0, projectsGraphQL_1.gqlGetIssuesForProject)(octokit, { projectNumber, findIssueNumbers: issueNumbers, owner }, {
-        issueCount: 1000, // This is the maximum - it will exit earlier if issues are found
+        issueCount,
     });
-    console.log(`Filtering issues: ${all ? 'all' : issueNumbers.join(', ')}`);
-    const targetIssues = all ? issuesInProject : filterIssues(issuesInProject, issueNumbers, repo);
+    console.log(`Filtering issues: ${hasFilter ? issueNumbers.join(', ') : 'all'}`);
+    const targetIssues = hasFilter ? filterIssues(issuesInProject, issueNumbers, repo) : issuesInProject;
     for (const issueNode of targetIssues) {
         console.log(`Updating issue target: ${issueNode.content.url}...`);
         try {
@@ -243,9 +247,6 @@ function verifyExpectedArgs(args) {
     }
     if (!issueNumber && !all) {
         throw new Error('Either "issueNumber" or "all" should be specified at once');
-    }
-    if ((issueNumber === null || issueNumber === void 0 ? void 0 : issueNumber.length) === 0 && !all) {
-        throw new Error('Either "issueNumber" or "all" must be specified');
     }
 }
 let fieldLookup = {};
