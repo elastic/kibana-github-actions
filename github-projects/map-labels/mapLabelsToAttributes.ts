@@ -110,8 +110,8 @@ export async function mapLabelsToAttributes(args: MapLabelsToAttributesArgs) {
   return updateResults;
 }
 
-function loadMapping(mappingName: string) {
-  const pathToMapping = path.join(__dirname, mappingName);
+function loadMapping(mappingFileName: string) {
+  const pathToMapping = path.join(__dirname, mappingFileName);
   const mapping = fs.readFileSync(pathToMapping, 'utf8');
   return JSON.parse(mapping);
 }
@@ -164,6 +164,7 @@ async function adjustSingleItemLabels(
       (field) => field.__typename === 'ProjectV2ItemFieldSingleSelectValue' && field.field.name === fieldName,
     );
 
+    const fieldLookup = await getFieldLookupObj(octokit, { projectNumber, owner });
     if (existingField) {
       const existingFieldValue = fieldLookup[fieldName]?.options.find((e) => e.id === existingField.optionId);
 
@@ -192,36 +193,38 @@ async function adjustSingleItemLabels(
   return updatedFields;
 }
 
-let fieldLookup: Record<string, SingleSelectField> = {};
-async function populateFieldLookup(
-  octokit: Octokit,
-  projectOptions: { projectNumber: number; owner: string },
-) {
-  const fieldOptions = await gqlGetFieldOptions(octokit, projectOptions);
+const getFieldLookupObj = (() => {
+  let fieldLookup: Record<string, SingleSelectField>;
 
-  const singleSelectFields = fieldOptions.organization.projectV2.fields.nodes.filter(
-    (f) => f.__typename === 'ProjectV2SingleSelectField',
-  );
+  return async (octokit: Octokit, projectOptions: { projectNumber: number; owner: string }) => {
+    if (typeof fieldLookup === 'undefined' || Object.keys(fieldLookup).length === 0) {
+      const fieldOptions = await gqlGetFieldOptions(octokit, projectOptions);
 
-  fieldLookup = singleSelectFields.reduce(
-    (acc, field) => {
-      acc[field.name] = field;
-      return acc;
-    },
-    {} as Record<string, SingleSelectField>,
-  );
+      const singleSelectFields = fieldOptions.organization.projectV2.fields.nodes.filter(
+        (f) => f.__typename === 'ProjectV2SingleSelectField',
+      );
 
-  console.log('Field lookup populated', fieldLookup);
-}
+      fieldLookup = singleSelectFields.reduce(
+        (acc, field) => {
+          acc[field.name] = field;
+          return acc;
+        },
+        {} as Record<string, SingleSelectField>,
+      );
+
+      console.log('Field lookup populated', fieldLookup);
+    }
+
+    return fieldLookup;
+  };
+})();
 
 async function getOptionIdForValue(
   octokit: Octokit,
   options: { projectNumber: number; fieldName: string; value: string; owner: string },
 ) {
   const { fieldName, value } = options;
-  if (Object.keys(fieldLookup).length === 0) {
-    await populateFieldLookup(octokit, options);
-  }
+  const fieldLookup = await getFieldLookupObj(octokit, options);
 
   const field = fieldLookup[fieldName];
   if (!field) {

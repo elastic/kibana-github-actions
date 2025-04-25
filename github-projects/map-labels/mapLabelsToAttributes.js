@@ -86,8 +86,8 @@ async function mapLabelsToAttributes(args) {
     return updateResults;
 }
 exports.mapLabelsToAttributes = mapLabelsToAttributes;
-function loadMapping(mappingName) {
-    const pathToMapping = path_1.default.join(__dirname, mappingName);
+function loadMapping(mappingFileName) {
+    const pathToMapping = path_1.default.join(__dirname, mappingFileName);
     const mapping = fs_1.default.readFileSync(pathToMapping, 'utf8');
     return JSON.parse(mapping);
 }
@@ -119,6 +119,7 @@ async function adjustSingleItemLabels(octokit, options) {
         }
         // Check if the field is already set
         const existingField = issueNode.fieldValues.nodes.find((field) => field.__typename === 'ProjectV2ItemFieldSingleSelectValue' && field.field.name === fieldName);
+        const fieldLookup = await getFieldLookupObj(octokit, { projectNumber, owner });
         if (existingField) {
             const existingFieldValue = (_a = fieldLookup[fieldName]) === null || _a === void 0 ? void 0 : _a.options.find((e) => e.id === existingField.optionId);
             console.log(`Field "${fieldName}" is already set to "${existingFieldValue === null || existingFieldValue === void 0 ? void 0 : existingFieldValue.name}" (${existingField.optionId}), skipping update`);
@@ -143,22 +144,25 @@ async function adjustSingleItemLabels(octokit, options) {
     }
     return updatedFields;
 }
-let fieldLookup = {};
-async function populateFieldLookup(octokit, projectOptions) {
-    const fieldOptions = await (0, projectsGraphQL_1.gqlGetFieldOptions)(octokit, projectOptions);
-    const singleSelectFields = fieldOptions.organization.projectV2.fields.nodes.filter((f) => f.__typename === 'ProjectV2SingleSelectField');
-    fieldLookup = singleSelectFields.reduce((acc, field) => {
-        acc[field.name] = field;
-        return acc;
-    }, {});
-    console.log('Field lookup populated', fieldLookup);
-}
+const getFieldLookupObj = (() => {
+    let fieldLookup;
+    return async (octokit, projectOptions) => {
+        if (typeof fieldLookup === 'undefined' || Object.keys(fieldLookup).length === 0) {
+            const fieldOptions = await (0, projectsGraphQL_1.gqlGetFieldOptions)(octokit, projectOptions);
+            const singleSelectFields = fieldOptions.organization.projectV2.fields.nodes.filter((f) => f.__typename === 'ProjectV2SingleSelectField');
+            fieldLookup = singleSelectFields.reduce((acc, field) => {
+                acc[field.name] = field;
+                return acc;
+            }, {});
+            console.log('Field lookup populated', fieldLookup);
+        }
+        return fieldLookup;
+    };
+})();
 async function getOptionIdForValue(octokit, options) {
     var _a;
     const { fieldName, value } = options;
-    if (Object.keys(fieldLookup).length === 0) {
-        await populateFieldLookup(octokit, options);
-    }
+    const fieldLookup = await getFieldLookupObj(octokit, options);
     const field = fieldLookup[fieldName];
     if (!field) {
         console.error(`Could not find field "${fieldName}" in project fields`);
