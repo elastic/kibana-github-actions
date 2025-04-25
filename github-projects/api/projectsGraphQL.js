@@ -17,22 +17,34 @@ const gqlGetProject = async (octokit, { projectNumber, owner }) => {
     return (await octokit.graphql(query)).organization.projectV2;
 };
 exports.gqlGetProject = gqlGetProject;
+/**
+ * Fetches issues for a project.
+ * In Github's graphql API, the projectV2 field has items in it, but not all of those are issues,
+ * so we have to paginate through, and collect issues to satisfy the issueCount.
+ * Also, the issues vector doesn't have any filtering, so we have to get pages, and filter them ourselves.
+ *
+ * @param octokit - The Octokit instance.
+ * @param projectNumber - The project number. (e.g.: https://github.com/<owner>/<repo>/projects/<projectNumber>)
+ * @param findIssueNumbers - An array of issue numbers to find.
+ * @param owner - The owner of the repository.
+ * @param limitOptions - Optional limit options for pagination.
+ * @returns An array of issues.
+ */
 const gqlGetIssuesForProject = async (octokit, { projectNumber, findIssueNumbers = [], owner, }, limitOptions) => {
     var _a, _b;
     const { issueCount = 20, issueFieldCount = 10, labelsCount = 10 } = limitOptions || {};
+    const findIssueNumbersSet = new Set(findIssueNumbers);
     console.log(`Fetching ${Math.max(findIssueNumbers === null || findIssueNumbers === void 0 ? void 0 : findIssueNumbers.length, issueCount)} issues for project ${projectNumber}...`);
     const results = [];
-    let issueStartCursor = (limitOptions === null || limitOptions === void 0 ? void 0 : limitOptions.issueStartCursor) || null;
+    let issueStartCursor = null;
     let nextPageExists = true;
-    const findIssueNumbersSet = new Set(findIssueNumbers);
     while (nextPageExists) {
         const startCursor = issueStartCursor ? `"${issueStartCursor}"` : null; // null is needed for first page, but it cannot be a string
-        const batchSize = Math.min(issueCount, MAX_BATCH_SIZE);
         const query = `
 query {
   organization(login: "${owner}") {
     projectV2(number: ${projectNumber}) {
-      items(first: ${batchSize}, after: ${startCursor}, orderBy: { field: POSITION, direction: DESC }) {
+      items(first: ${MAX_BATCH_SIZE}, after: ${startCursor}, orderBy: { field: POSITION, direction: DESC }) {
         pageInfo {
           endCursor
           hasNextPage

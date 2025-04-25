@@ -108,31 +108,31 @@ const argsFromInputs = {
 /**
  * Main function
  */
-async function main(args) {
-    const combinedArgs = combineAndVerifyArgs(argsFromInputs, args);
-    const { issueNumber, projectNumber, owner, repo, mapping, all, dryRun, githubToken } = combinedArgs;
-    const issueNumbers = issueNumber || [];
+async function mapLabelsToAttributes(args) {
+    const { issueNumber, projectNumber, owner, repo, mapping, all, dryRun, githubToken } = combineAndVerifyArgs(argsFromInputs, args);
     const updateResults = {
         success: [],
         failure: [],
         skipped: [],
         projectUrl: '',
     };
-    if (dryRun) {
-        console.log('Running in dry-run mode. No changes will be made.');
-    }
+    const issueNumbers = issueNumber || [];
+    const hasFilter = issueNumbers.length > 0;
+    // If we're requesting all issues, we should list ~1000 issues to max it out
+    // if we have a filter, we will also want to search for those issues, so max it out
+    // if we're running with either of these args, we should be fine with the 50 most recent
+    const issueCount = hasFilter || all ? 1000 : 50;
     const octokit = new rest_1.Octokit({
         auth: githubToken.trim(),
     });
+    if (dryRun) {
+        console.log('⚠️ Running in dry-run mode. No changes will be made.');
+    }
     console.log(`Loading label mapping file ${mapping}`);
     const labelsToFields = loadMapping(mapping);
     console.log(`Requesting project ${owner}/${projectNumber} and its issues...`);
     const projectAndFields = await (0, projectsGraphQL_1.gqlGetProject)(octokit, { projectNumber, owner });
     updateResults.projectUrl = projectAndFields.url;
-    const hasFilter = (issueNumbers === null || issueNumbers === void 0 ? void 0 : issueNumbers.length) > 0;
-    // If we're requesting all issues, we should list ~1000 issues to max it out
-    // if we're not, we should be fine with the 50 most recent
-    const issueCount = hasFilter || all ? 1000 : 50;
     const issuesInProject = await (0, projectsGraphQL_1.gqlGetIssuesForProject)(octokit, { projectNumber, findIssueNumbers: issueNumbers, owner }, {
         issueCount,
     });
@@ -308,7 +308,7 @@ function tryGetOwnerFromContext() {
     }
 }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-main(parsedCliArgs)
+mapLabelsToAttributes(parsedCliArgs)
     .then(async (results) => {
     await sleep(1000); // Wait for the last log to flush
     const { success, failure, skipped, projectUrl } = results;
