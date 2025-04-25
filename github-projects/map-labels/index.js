@@ -27,15 +27,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
 const yargs_1 = __importDefault(require("yargs"));
 const core = __importStar(require("@actions/core"));
 const github_1 = require("@actions/github");
-const rest_1 = require("@octokit/rest");
-const projectsGraphQL_1 = require("../api/projectsGraphQL");
-const url_1 = require("url");
-const DEFAULT_OWNER_ORG = 'elastic';
+const mapLabelsToAttributes_1 = require("./mapLabelsToAttributes");
+const utils_1 = require("./utils");
 /**
  * This script should map labels to fields in a GitHub project board.
  * Since projects can exist outside of a repo, we need to pass in the owner and repo as arguments.
@@ -91,226 +87,62 @@ const parsedCliArgs = (0, yargs_1.default)(process.argv.slice(2))
     hidden: true,
 })
     .help().argv;
-const argsFromInputs = {
-    owner: core.getInput('owner') || tryGetOwnerFromContext() || DEFAULT_OWNER_ORG,
-    projectNumber: core.getInput('project-number') ? parseInt(core.getInput('project-number')) : undefined,
-    issueNumber: core.getInput('issue-number')
-        ? core
-            .getInput('issue-number')
-            .split(',')
-            .map((n) => parseInt(n))
-        : [],
-    all: core.getInput('all') === 'true',
-    mapping: core.getInput('mapping'),
-    githubToken: core.getInput('github-token') || process.env.GITHUB_TOKEN,
-    dryRun: core.getInput('dry-run') === 'true',
-};
-/**
- * Main function
- */
-async function mapLabelsToAttributes(args) {
-    const { issueNumber, projectNumber, owner, repo, mapping, all, dryRun, githubToken } = combineAndVerifyArgs(argsFromInputs, args);
-    const updateResults = {
-        success: [],
-        failure: [],
-        skipped: [],
-        projectUrl: '',
-    };
-    const issueNumbers = issueNumber || [];
-    const hasFilter = issueNumbers.length > 0;
-    // If we're requesting all issues, we should list ~1000 issues to max it out
-    // if we have a filter, we will also want to search for those issues, so max it out
-    // if we're running with either of these args, we should be fine with the 50 most recent
-    const issueCount = hasFilter || all ? 1000 : 50;
-    const octokit = new rest_1.Octokit({
-        auth: githubToken.trim(),
-    });
-    if (dryRun) {
-        console.log('⚠️ Running in dry-run mode. No changes will be made.');
-    }
-    console.log(`Loading label mapping file ${mapping}`);
-    const labelsToFields = loadMapping(mapping);
-    console.log(`Requesting project ${owner}/${projectNumber} and its issues...`);
-    const projectAndFields = await (0, projectsGraphQL_1.gqlGetProject)(octokit, { projectNumber, owner });
-    updateResults.projectUrl = projectAndFields.url;
-    const issuesInProject = await (0, projectsGraphQL_1.gqlGetIssuesForProject)(octokit, { projectNumber, findIssueNumbers: issueNumbers, owner }, {
-        issueCount,
-    });
-    console.log(`Filtering issues: ${hasFilter ? issueNumbers.join(', ') : 'all'}`);
-    const targetIssues = hasFilter ? filterIssues(issuesInProject, issueNumbers, repo) : issuesInProject;
-    for (const issueNode of targetIssues) {
-        console.log(`Updating issue target: ${issueNode.content.url}...`);
-        try {
-            const updatedFields = await adjustSingleItemLabels(octokit, {
-                issueNode,
-                owner,
-                projectNumber,
-                projectId: projectAndFields.id,
-                mapping: labelsToFields,
-                dryRun,
-            });
-            if (updatedFields.length) {
-                console.log(`Updated fields: ${updatedFields.join(', ')}`);
-                updateResults.success.push(issueNode);
-            }
-            else {
-                console.log('No fields updated');
-                updateResults.skipped.push(issueNode);
-            }
-        }
-        catch (error) {
-            console.error('Error updating issue', error);
-            updateResults.failure.push(issueNode);
-        }
-    }
-    return updateResults;
-}
-function filterIssues(issuesInProject, issueNumbers, repo) {
-    const targetIssues = issuesInProject.filter((issue) => {
-        if (!repo) {
-            return issueNumbers.includes(issue.content.number);
-        }
-        else {
-            return issueNumbers.includes(issue.content.number) && issue.content.repository.name === repo;
-        }
-    });
-    if (!targetIssues.length) {
-        console.error(`Could not find any update target(s) in repo "${repo}" issues: ${issueNumbers}`);
-        throw new Error('No target issues found');
+function getInputOrUndefined(name, parse) {
+    const value = core.getInput(name);
+    if (value.length > 0) {
+        return parse ? parse(value) : value;
     }
     else {
-        console.log(`Found ${targetIssues.length} target issue(s) for update`);
+        return undefined;
     }
-    return targetIssues;
 }
-function combineAndVerifyArgs(defaults, args) {
-    const combinedArgs = { ...defaults, ...args };
-    verifyExpectedArgs(combinedArgs);
-    return combinedArgs;
-}
-async function adjustSingleItemLabels(octokit, options) {
-    var _a;
-    const { issueNode, projectNumber, projectId, mapping, owner, dryRun } = options;
-    const { content: issue, id: itemId } = issueNode;
-    const labels = issue.labels.nodes;
-    const updatedFields = [];
-    // Get fields for each mappable label
-    for (const label of labels) {
-        const fieldUpdate = mapping[label.name];
-        if (!fieldUpdate) {
-            continue;
-        }
-        const fieldName = Object.keys(fieldUpdate)[0];
-        const value = fieldUpdate[fieldName];
-        console.log('Finding option for value', { fieldName, value });
-        // Get field id
-        const optionForValue = await getOptionIdForValue(octokit, { projectNumber, fieldName, value, owner });
-        if (!optionForValue) {
-            continue;
-        }
-        // Check if the field is already set
-        const existingField = issueNode.fieldValues.nodes.find((field) => field.__typename === 'ProjectV2ItemFieldSingleSelectValue' && field.field.name === fieldName);
-        if (existingField) {
-            const existingFieldValue = (_a = fieldLookup[fieldName]) === null || _a === void 0 ? void 0 : _a.options.find((e) => e.id === existingField.optionId);
-            console.log(`Field "${fieldName}" is already set to "${existingFieldValue === null || existingFieldValue === void 0 ? void 0 : existingFieldValue.name}" (${existingField.optionId}), skipping update`);
-            continue;
-        }
-        // update field
-        console.log(`Updating field "${fieldName}" to "${value}" (${optionForValue.optionId})`);
-        const updateParams = {
-            projectId,
-            itemId,
-            fieldId: optionForValue.fieldId,
-            optionId: optionForValue.optionId,
-            fieldName,
-        };
-        if (dryRun) {
-            console.log('Dry run: skipping update for parameters', updateParams);
-        }
-        else {
-            await (0, projectsGraphQL_1.gqlUpdateFieldValue)(octokit, updateParams);
-        }
-        updatedFields.push(fieldName);
-    }
-    return updatedFields;
-}
+const argsFromActionInputs = {
+    owner: getInputOrUndefined('owner'),
+    repo: getInputOrUndefined('repo'),
+    projectNumber: getInputOrUndefined('project-number', parseInt),
+    issueNumber: getInputOrUndefined('issue-number', (v) => v.split(',').map((i) => parseInt(i))),
+    all: getInputOrUndefined('all', (v) => v === 'true'),
+    mapping: getInputOrUndefined('mapping'),
+    githubToken: getInputOrUndefined('github-token') || process.env.GITHUB_TOKEN,
+    dryRun: getInputOrUndefined('dry-run', (v) => v === 'true'),
+};
 function verifyExpectedArgs(args) {
-    const { owner, projectNumber, issueNumber, all, githubToken } = args;
-    if (!owner) {
+    var _a;
+    if (!args.owner) {
         throw new Error('Owner from context or args cannot be inferred, but is required');
     }
-    if (!projectNumber) {
+    if (!args.projectNumber) {
         throw new Error('Project number is required for a single issue update');
     }
-    if (!githubToken) {
+    if (!args.githubToken) {
         throw new Error('GitHub token is required for authentication');
     }
-    if (!issueNumber && !all) {
+    if (((_a = args.issueNumber) === null || _a === void 0 ? void 0 : _a.length) && args.all) {
         throw new Error('Either "issueNumber" or "all" should be specified at once');
     }
 }
-let fieldLookup = {};
-async function populateFieldLookup(octokit, projectOptions) {
-    const fieldOptions = await (0, projectsGraphQL_1.gqlGetFieldOptions)(octokit, projectOptions);
-    const singleSelectFields = fieldOptions.organization.projectV2.fields.nodes.filter((f) => f.__typename === 'ProjectV2SingleSelectField');
-    fieldLookup = singleSelectFields.reduce((acc, field) => {
-        acc[field.name] = field;
-        return acc;
-    }, {});
-    console.log('Field lookup populated', fieldLookup);
-}
-async function getOptionIdForValue(octokit, options) {
-    var _a;
-    const { fieldName, value } = options;
-    if (Object.keys(fieldLookup).length === 0) {
-        await populateFieldLookup(octokit, options);
-    }
-    const field = fieldLookup[fieldName];
-    if (!field) {
-        console.error(`Could not find field "${fieldName}" in project fields`);
-        return null;
-    }
-    const optionId = (_a = field.options.find((o) => o.name === value)) === null || _a === void 0 ? void 0 : _a.id;
-    if (!optionId) {
-        console.warn(`Could not find option for field "${fieldName}" and value "${value}"`, field.options);
-        return null;
-    }
-    else {
-        return {
-            optionId,
-            fieldId: field.id,
-        };
-    }
-}
-function loadMapping(mappingName) {
-    const pathToMapping = path_1.default.join(__dirname, mappingName);
-    const mapping = fs_1.default.readFileSync(pathToMapping, 'utf8');
-    return JSON.parse(mapping);
-}
-function getIssueLinks(projectUrl, issue) {
-    const issueBodyUrl = issue.content.url;
-    const search = new url_1.URLSearchParams();
-    search.set('pane', 'issue');
-    search.set('itemId', issue.fullDatabaseId.toString());
-    search.set('issue', issue.content.resourcePath);
-    const issueRef = new url_1.URL(projectUrl);
-    issueRef.search = search.toString();
-    return `${issueBodyUrl} | ${issueRef}`;
-}
 function tryGetOwnerFromContext() {
+    const DEFAULT_OWNER_ORG = 'elastic';
     try {
         // Might throw if the context is not available
         return github_1.context.repo.owner;
     }
     catch (error) {
-        console.warn('Could not get owner from context: ', error.message);
-        return undefined;
+        return DEFAULT_OWNER_ORG;
     }
 }
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-mapLabelsToAttributes(parsedCliArgs)
+function combineAndVerifyArgs(argsFromActionInputs, argsFromCli) {
+    const defaults = {
+        owner: tryGetOwnerFromContext(),
+        issueNumber: [],
+    };
+    const combinedArgs = (0, utils_1.merge)((0, utils_1.merge)(defaults, argsFromActionInputs), argsFromCli);
+    verifyExpectedArgs(combinedArgs);
+    return combinedArgs;
+}
+(0, mapLabelsToAttributes_1.mapLabelsToAttributes)(combineAndVerifyArgs(argsFromActionInputs, parsedCliArgs))
     .then(async (results) => {
-    await sleep(1000); // Wait for the last log to flush
+    await (0, utils_1.sleep)(1000); // Wait for the last log to flush
     const { success, failure, skipped, projectUrl } = results;
     if (failure.length) {
         console.warn('Some issues failed to update:', failure);
@@ -319,7 +151,7 @@ mapLabelsToAttributes(parsedCliArgs)
         console.log('All issues updated successfully.');
     }
     console.log(`Updated ${success.length} issues in project ${projectUrl} (${skipped.length} skipped)`);
-    success.forEach((issue) => console.log(`\t- ${getIssueLinks(projectUrl, issue)}`));
+    success.forEach((issue) => console.log(`\t- ${(0, utils_1.getIssueLinks)(projectUrl, issue)}`));
     process.exit(0);
 })
     .catch((error) => {

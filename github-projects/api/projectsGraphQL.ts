@@ -120,7 +120,7 @@ export const gqlGetProject = async (
  * Fetches issues for a project.
  * In Github's graphql API, the projectV2 field has items in it, but not all of those are issues,
  * so we have to paginate through, and collect issues to satisfy the issueCount.
- * Also, the issues vector doesn't have any filtering, so we have to get pages, and filter them ourselves.
+ * Also, the issues listing doesn't have any filtering, so we have to get pages, and filter them ourselves.
  *
  * @param octokit - The Octokit instance.
  * @param projectNumber - The project number. (e.g.: https://github.com/<owner>/<repo>/projects/<projectNumber>)
@@ -145,13 +145,12 @@ export const gqlGetIssuesForProject = async (
   const { issueCount = 20, issueFieldCount = 10, labelsCount = 10 } = limitOptions || {};
   const findIssueNumbersSet = new Set(findIssueNumbers);
 
-  console.log(
-    `Fetching ${Math.max(findIssueNumbers?.length, issueCount)} issues for project ${projectNumber}...`,
-  );
+  console.log(`Fetching ${findIssueNumbers?.length || issueCount} issues for project ${projectNumber}...`);
 
   const results: ProjectIssuesResponse['organization']['projectV2']['items']['nodes'] = [];
   let issueStartCursor: null | string = null;
   let nextPageExists = true;
+  let totalFetched = 0;
 
   while (nextPageExists) {
     const startCursor: null | string = issueStartCursor ? `"${issueStartCursor}"` : null; // null is needed for first page, but it cannot be a string
@@ -212,34 +211,39 @@ query {
     const responseItems = (await octokit.graphql<ProjectIssuesResponse>(query)).organization.projectV2.items;
 
     const responseIssues = responseItems.nodes.filter((i) => i.content?.__typename === 'Issue');
-    results.push(...responseIssues);
+    totalFetched += responseIssues.length;
 
     responseIssues.forEach((issue) => {
-      if (findIssueNumbersSet.has(issue.content.number)) {
-        findIssueNumbersSet.delete(issue.content.number);
+      if (findIssueNumbers.length) {
+        if (findIssueNumbersSet.has(issue.content.number)) {
+          results.push(issue);
+          findIssueNumbersSet.delete(issue.content.number);
+        }
+      } else {
+        results.push(issue);
       }
     });
 
     if (findIssueNumbers.length && findIssueNumbersSet.size === 0) {
-      console.log('Found all filtered issues');
+      console.log(`Found all requested ${findIssueNumbers.length} issues`);
       break;
     } else if (results.length >= issueCount) {
-      console.log('Fetched enough issues');
+      console.log(`Fetched all requested ${issueCount} issues`);
       break;
     } else if (responseItems.pageInfo?.hasNextPage) {
-      console.log(`Fetched ${results.length} of ${issueCount} issues, fetching more...`);
+      console.log(`Fetched ${totalFetched} of ${issueCount} issues, fetching more...`);
       nextPageExists = true;
       if (nextPageExists) {
         issueStartCursor = responseItems.pageInfo?.endCursor || null;
       }
-      console.log('Fetching more issues...');
     } else {
       console.log('No more issues to fetch');
       nextPageExists = false;
+      break;
     }
   }
 
-  return results.slice(0, issueCount);
+  return results;
 };
 
 export const gqlGetFieldOptions = (
