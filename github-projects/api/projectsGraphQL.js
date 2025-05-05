@@ -127,7 +127,6 @@ query {
         else {
             console.log('No more issues to fetch');
             nextPageExists = false;
-            break;
         }
     }
     return results;
