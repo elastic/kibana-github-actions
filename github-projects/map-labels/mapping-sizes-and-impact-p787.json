@@ -1,0 +1,28 @@
+{
+  "loe:small": {
+    "Size": "🐇 Small (d)"
+  },
+  "loe:medium": {
+    "Size": "🐄 Medium (w)"
+  },
+  "loe:large": {
+    "Size": "🐙 Large (m)"
+  },
+  "loe:x-large": {
+    "Size": "🐳 X-Large"
+  },
+  "loe:needs-research": null,
+  "impact:low": {
+    "Impact": "Low"
+  },
+  "impact:medium": {
+    "Impact": "Medium"
+  },
+  "impact:high": {
+    "Impact": "High"
+  },
+  "impact:critical": {
+    "Impact": "Critical"
+  },
+  "impact:needs-assessment": null
+}
