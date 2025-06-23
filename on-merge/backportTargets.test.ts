@@ -69,9 +69,9 @@ describe('backportTargets', () => {
       expect(branches).to.eql(['7.17', '7.x', '8.3', '8.4']);
     });
 
-    it('should resolve all-open and add all branches', () => {
+    it('should resolve all-open and add all branches excluding main and 7.17', () => {
       const branches = resolveTargets(mockVersions, mockVersionMap, ['backport:all-open']);
-      expect(branches).to.eql(['7.17', '7.x', '8.3', '8.4']);
+      expect(branches).to.eql(['7.x', '8.3', '8.4']);
     });
 
     it('should resolve hard-coded version labels', () => {
