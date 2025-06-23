@@ -32,6 +32,9 @@ export function resolveTargets(versions: VersionsParsed, versionMap: VersionMap,
   if (labels.includes('backport:all-open')) {
     versions.all
       .filter((version) => version.branch !== 'main')
+      // 7.17 is still active, but not a target for all-open
+      // backports will specifically opt in using backport:version
+      .filter((version) => version.branch !== '7.17')
       .forEach((version) => targets.add(version.branch));
   }
 
