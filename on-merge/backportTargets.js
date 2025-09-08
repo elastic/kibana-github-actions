@@ -1,39 +1,24 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resolveTargets = void 0;
-const semver = require('semver');
-function getBranchesAfter(versions, version) {
-    return versions.all
-        .filter((v) => !v.currentMinor)
-        .filter((v) => semver.compare(v.version, version) >= 0)
-        .map((v) => v.branch)
-        .sort();
-}
+exports.resolveTargets = exports.BACKPORT_LABELS = void 0;
+const util_1 = require("./util");
+exports.BACKPORT_LABELS = {
+    SKIP: 'backport:skip',
+    ALL_OPEN: 'backport:all-open',
+    VERSION: 'backport:version',
+};
 function resolveTargets(versions, versionMap, labelsOriginal) {
     const targets = new Set();
     const labels = labelsOriginal.map((label) => label.toLowerCase());
-    if (labels.includes('backport:prev-minor')) {
-        targets.add(versions.previousMinor.branch);
-    }
-    if (labels.includes('backport:prev-major')) {
-        versions.all.filter((version) => version.previousMajor).forEach((version) => targets.add(version.branch));
-    }
-    if (labels.includes('backport:current-major')) {
+    // All open branches
+    if (labels.includes(exports.BACKPORT_LABELS.ALL_OPEN)) {
         versions.all
-            .filter((version) => version.currentMajor && version.branch !== 'main')
+            .filter((version) => version.branchType !== 'unmaintained' && version.branchType !== 'development')
             .forEach((version) => targets.add(version.branch));
     }
-    if (labels.includes('backport:all-open')) {
-        versions.all
-            .filter((version) => version.branch !== 'main')
-            // 7.17 is still active, but not a target for all-open
-            // backports will specifically opt in using backport:version
-            .filter((version) => version.branch !== '7.17')
-            .forEach((version) => targets.add(version.branch));
-    }
-    labels
-        .filter((label) => label.match(/^v[0-9]+\.[0-9]+\.[0-9]+$/))
-        .forEach((label) => {
+    // Versions mapped from the labels
+    const versionLabels = (0, util_1.getVersionLabels)(labels);
+    versionLabels.forEach((label) => {
         let branch = null;
         for (const [regex, replacement] of Object.entries(versionMap)) {
             const matcher = new RegExp(regex);
@@ -44,11 +29,6 @@ function resolveTargets(versions, versionMap, labelsOriginal) {
         }
         if (branch && branch !== 'main') {
             targets.add(branch);
-            if (!labels.includes('backport:version') && !labels.includes('auto-backport')) {
-                // Fill in gaps, e.g. if `v8.1.0` is specified, add everything that is currently open between 8.1 and <main>
-                const version = label.substring(1);
-                getBranchesAfter(versions, version).forEach((branch) => targets.add(branch));
-            }
         }
     });
     return [...targets].sort();
