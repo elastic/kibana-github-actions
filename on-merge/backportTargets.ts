@@ -7,7 +7,11 @@ export const BACKPORT_LABELS = {
   VERSION: 'backport:version',
 };
 
-export function resolveTargets(versions: VersionsParsed, versionMap: VersionMap, labelsOriginal: string[]) {
+export function resolveTargets(
+  versions: VersionsParsed,
+  versionToBranchMap: VersionMap,
+  labelsOriginal: string[],
+) {
   const targets = new Set<string>();
 
   const labels = labelsOriginal.map((label) => label.toLowerCase());
@@ -23,7 +27,7 @@ export function resolveTargets(versions: VersionsParsed, versionMap: VersionMap,
   const versionLabels = getVersionLabels(labels);
   versionLabels.forEach((label) => {
     let branch = null;
-    for (const [regex, replacement] of Object.entries(versionMap)) {
+    for (const [regex, replacement] of Object.entries(versionToBranchMap)) {
       const matcher = new RegExp(regex);
       if (matcher.test(label)) {
         branch = label.replace(matcher, replacement);

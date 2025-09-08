@@ -7,7 +7,7 @@ exports.BACKPORT_LABELS = {
     ALL_OPEN: 'backport:all-open',
     VERSION: 'backport:version',
 };
-function resolveTargets(versions, versionMap, labelsOriginal) {
+function resolveTargets(versions, versionToBranchMap, labelsOriginal) {
     const targets = new Set();
     const labels = labelsOriginal.map((label) => label.toLowerCase());
     // All open branches
@@ -20,7 +20,7 @@ function resolveTargets(versions, versionMap, labelsOriginal) {
     const versionLabels = (0, util_1.getVersionLabels)(labels);
     versionLabels.forEach((label) => {
         let branch = null;
-        for (const [regex, replacement] of Object.entries(versionMap)) {
+        for (const [regex, replacement] of Object.entries(versionToBranchMap)) {
             const matcher = new RegExp(regex);
             if (matcher.test(label)) {
                 branch = label.replace(matcher, replacement);
