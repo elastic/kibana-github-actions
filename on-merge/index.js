@@ -41,10 +41,10 @@ async function main() {
     const versionMap = (backportConfig === null || backportConfig === void 0 ? void 0 : backportConfig.branchLabelMapping) || {};
     const versionsConfig = await githubWrapper.getFileContent('versions.json');
     const versions = (0, versions_1.parseVersions)(versionsConfig);
+    const currentLabel = `v${versions.current.version}`;
     const pullRequestPayload = payload;
     const pullRequest = pullRequestPayload.pull_request;
     if (pullRequest.base.ref === 'main') {
-        const currentLabel = `v${versions.current.version}`;
         // Fix the backport:version label, if the only version label is the current version
         if ((0, util_1.getVersionLabels)(pullRequest.labels).length === 1 &&
             (0, util_1.getVersionLabels)(pullRequest.labels)[0] === currentLabel &&
@@ -57,14 +57,15 @@ async function main() {
         if (!(0, util_1.labelsContain)(pullRequest.labels, currentLabel)) {
             await githubWrapper.addLabels(pullRequest.number, [currentLabel]);
         }
-        // Find backport targets
-        const targets = (0, backportTargets_1.resolveTargets)(versions, versionMap, pullRequest.labels.map((label) => label.name));
         if ((0, util_1.labelsContain)(pullRequest.labels, backportTargets_1.BACKPORT_LABELS.SKIP)) {
             console.log("Backport skipped because 'backport:skip' label is present");
             return;
         }
+        // Find backport targets
+        const targets = (0, backportTargets_1.resolveTargets)(versions, versionMap, pullRequest.labels.map((label) => label.name));
         if (!targets.length) {
-            console.log(`No backport targets found.`);
+            console.log(`Backport skipped, because no backport targets found.`);
+            return;
         }
         try {
             // Log action URL
