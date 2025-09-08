@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { Octokit } from '@octokit/rest';
+import { getOctokit } from '@actions/github';
+import { Octokit } from '../types';
 
 import {
   gqlGetFieldOptions,
@@ -42,9 +43,7 @@ export async function mapLabelsToAttributes(args: MapLabelsToAttributesArgs) {
   // if we're running with either of these args, we should be fine with the 50 most recent
   const issueCount = hasFilter || all ? 1000 : 50;
 
-  const octokit = new Octokit({
-    auth: githubToken.trim(),
-  });
+  const octokit = getOctokit(githubToken.trim());
 
   if (dryRun) {
     console.log('⚠️ Running in dry-run mode. No changes will be made.');
