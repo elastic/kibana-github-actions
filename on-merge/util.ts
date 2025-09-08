@@ -1,7 +1,8 @@
-import { Octokit } from '@octokit/rest';
 import { Commit } from 'backport';
 import axios from 'axios';
 import semver from 'semver';
+
+type Octokit = ReturnType<typeof import('@actions/github').getOctokit>;
 
 export async function getPrPackageVersion(
   github: Octokit['rest'],

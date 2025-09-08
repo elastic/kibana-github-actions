@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.mapLabelsToAttributes = void 0;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
-const rest_1 = require("@octokit/rest");
+const github_1 = require("@actions/github");
 const projectsGraphQL_1 = require("../api/projectsGraphQL");
 /**
  * Lists issues in a github project, and updates fields on them based on the mapping file given.
@@ -26,9 +26,7 @@ async function mapLabelsToAttributes(args) {
     // if we have a filter, we will also want to search for those issues, so max it out
     // if we're running with either of these args, we should be fine with the 50 most recent
     const issueCount = hasFilter || all ? 1000 : 50;
-    const octokit = new rest_1.Octokit({
-        auth: githubToken.trim(),
-    });
+    const octokit = (0, github_1.getOctokit)(githubToken.trim());
     if (dryRun) {
         console.log('⚠️ Running in dry-run mode. No changes will be made.');
     }
