@@ -29,58 +29,34 @@ export async function main() {
 
   if (pullRequest.base.ref === 'main') {
     // Fix the backport:version label, if the only version label is the current version
-    if (
-      getVersionLabels(pullRequest.labels).length === 1 &&
-      getVersionLabels(pullRequest.labels)[0] === currentLabel &&
-      labelsContain(pullRequest.labels, BACKPORT_LABELS.VERSION)
-    ) {
-      await githubWrapper.removeLabel(pullRequest.number, BACKPORT_LABELS.VERSION);
-      await githubWrapper.addLabels(pullRequest.number, [BACKPORT_LABELS.SKIP]);
-      console.log("Adjusted labels: removing 'backport:version' and adding 'backport:skip'");
+    if (isPRBackportToCurrentRelease(pullRequest, currentLabel)) {
+      await githubWrapper.removeLabels(pullRequest, [BACKPORT_LABELS.VERSION]);
+      await githubWrapper.addLabels(pullRequest, [BACKPORT_LABELS.SKIP]);
+      core.info("Adjusted labels: removing 'backport:version' and adding 'backport:skip'");
     }
 
     // Add current target label
     if (!labelsContain(pullRequest.labels, currentLabel)) {
-      await githubWrapper.addLabels(pullRequest.number, [currentLabel]);
+      await githubWrapper.addLabels(pullRequest, [currentLabel]);
     }
 
+    // Skip backport if skip label is present
     if (labelsContain(pullRequest.labels, BACKPORT_LABELS.SKIP)) {
-      console.log("Backport skipped because 'backport:skip' label is present");
+      core.info("Backport skipped because 'backport:skip' label is present");
       return;
     }
 
     // Find backport targets
-    const targets = resolveTargets(
-      versions,
-      versionMap,
-      pullRequest.labels.map((label) => label.name),
-    );
+    const labelNames = pullRequest.labels.map((label) => label.name);
+    const targets = resolveTargets(versions, versionMap, labelNames);
 
     if (!targets.length) {
-      console.log(`Backport skipped, because no backport targets found.`);
+      core.info(`Backport skipped, because no backport targets found.`);
       return;
     }
 
-    try {
-      // Log action URL
-      const actionUrl = getGithubActionURL(process.env);
-      await githubWrapper.createComment(
-        pullRequest.number,
-        [`Starting backport for target branches: ${targets.join(', ')}`, actionUrl]
-          .filter(Boolean)
-          .join('\n\n'),
-      );
-
-      // Mark PR body with backport targets
-      await githubWrapper.updatePullRequest(pullRequest.number, {
-        body: `${pullRequest.body}\n\n<!--ONMERGE ${JSON.stringify({
-          backportTargets: targets,
-        })} ONMERGE-->`,
-      });
-    } catch (error) {
-      console.error('An error occurred', error);
-      core.setFailed(error.message);
-    }
+    // Add comment about planned backports and update PR body with backport metadata
+    await updatePRWithBackportInfo(githubWrapper, pullRequest, targets);
 
     // Start backport for the calculated targets
     await backportRun({
@@ -111,11 +87,45 @@ export async function main() {
         }
 
         await githubWrapper.addLabels(
-          pr.sourcePullRequest.number,
+          pr.sourcePullRequest as any,
           [`v${prPackageVersion}`], // TODO switch this to use getVersionLabel when it's appropriate to increment patch versions after BCs
         );
       }
     }
+  }
+}
+
+function isPRBackportToCurrentRelease(pullRequest: { labels: { name: string }[] }, currentLabel: string) {
+  return (
+    getVersionLabels(pullRequest.labels).length === 1 &&
+    getVersionLabels(pullRequest.labels)[0] === currentLabel &&
+    labelsContain(pullRequest.labels, BACKPORT_LABELS.VERSION)
+  );
+}
+
+async function updatePRWithBackportInfo(
+  githubWrapper: GithubWrapper,
+  pullRequest: { number: number; body: string },
+  targets: string[],
+) {
+  try {
+    const actionUrl = getGithubActionURL(process.env);
+    await githubWrapper.createComment(
+      pullRequest.number,
+      [`Starting backport for target branches: ${targets.join(', ')}`, actionUrl]
+        .filter(Boolean)
+        .join('\n\n'),
+    );
+
+    // Mark PR body with backport targets
+    await githubWrapper.updatePullRequest(pullRequest.number, {
+      body: `${pullRequest.body}\n\n<!--ONMERGE ${JSON.stringify({
+        backportTargets: targets,
+      })} ONMERGE-->`,
+    });
+  } catch (error) {
+    core.error(error);
+    core.setFailed(error.message);
   }
 }
 

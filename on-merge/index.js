@@ -47,44 +47,29 @@ async function main() {
     const pullRequest = pullRequestPayload.pull_request;
     if (pullRequest.base.ref === 'main') {
         // Fix the backport:version label, if the only version label is the current version
-        if ((0, util_1.getVersionLabels)(pullRequest.labels).length === 1 &&
-            (0, util_1.getVersionLabels)(pullRequest.labels)[0] === currentLabel &&
-            (0, util_1.labelsContain)(pullRequest.labels, backportTargets_1.BACKPORT_LABELS.VERSION)) {
-            await githubWrapper.removeLabel(pullRequest.number, backportTargets_1.BACKPORT_LABELS.VERSION);
-            await githubWrapper.addLabels(pullRequest.number, [backportTargets_1.BACKPORT_LABELS.SKIP]);
-            console.log("Adjusted labels: removing 'backport:version' and adding 'backport:skip'");
+        if (isPRBackportToCurrentRelease(pullRequest, currentLabel)) {
+            await githubWrapper.removeLabels(pullRequest, [backportTargets_1.BACKPORT_LABELS.VERSION]);
+            await githubWrapper.addLabels(pullRequest, [backportTargets_1.BACKPORT_LABELS.SKIP]);
+            core.info("Adjusted labels: removing 'backport:version' and adding 'backport:skip'");
         }
         // Add current target label
         if (!(0, util_1.labelsContain)(pullRequest.labels, currentLabel)) {
-            await githubWrapper.addLabels(pullRequest.number, [currentLabel]);
+            await githubWrapper.addLabels(pullRequest, [currentLabel]);
         }
+        // Skip backport if skip label is present
         if ((0, util_1.labelsContain)(pullRequest.labels, backportTargets_1.BACKPORT_LABELS.SKIP)) {
-            console.log("Backport skipped because 'backport:skip' label is present");
+            core.info("Backport skipped because 'backport:skip' label is present");
             return;
         }
         // Find backport targets
-        const targets = (0, backportTargets_1.resolveTargets)(versions, versionMap, pullRequest.labels.map((label) => label.name));
+        const labelNames = pullRequest.labels.map((label) => label.name);
+        const targets = (0, backportTargets_1.resolveTargets)(versions, versionMap, labelNames);
         if (!targets.length) {
-            console.log(`Backport skipped, because no backport targets found.`);
+            core.info(`Backport skipped, because no backport targets found.`);
             return;
         }
-        try {
-            // Log action URL
-            const actionUrl = (0, util_1.getGithubActionURL)(process.env);
-            await githubWrapper.createComment(pullRequest.number, [`Starting backport for target branches: ${targets.join(', ')}`, actionUrl]
-                .filter(Boolean)
-                .join('\n\n'));
-            // Mark PR body with backport targets
-            await githubWrapper.updatePullRequest(pullRequest.number, {
-                body: `${pullRequest.body}\n\n<!--ONMERGE ${JSON.stringify({
-                    backportTargets: targets,
-                })} ONMERGE-->`,
-            });
-        }
-        catch (error) {
-            console.error('An error occurred', error);
-            core.setFailed(error.message);
-        }
+        // Add comment about planned backports and update PR body with backport metadata
+        await updatePRWithBackportInfo(githubWrapper, pullRequest, targets);
         // Start backport for the calculated targets
         await (0, backport_1.backportRun)({
             options: {
@@ -112,12 +97,35 @@ async function main() {
                 if (!pr.sourcePullRequest) {
                     continue;
                 }
-                await githubWrapper.addLabels(pr.sourcePullRequest.number, [`v${prPackageVersion}`]);
+                await githubWrapper.addLabels(pr.sourcePullRequest, [`v${prPackageVersion}`]);
             }
         }
     }
 }
 exports.main = main;
+function isPRBackportToCurrentRelease(pullRequest, currentLabel) {
+    return ((0, util_1.getVersionLabels)(pullRequest.labels).length === 1 &&
+        (0, util_1.getVersionLabels)(pullRequest.labels)[0] === currentLabel &&
+        (0, util_1.labelsContain)(pullRequest.labels, backportTargets_1.BACKPORT_LABELS.VERSION));
+}
+async function updatePRWithBackportInfo(githubWrapper, pullRequest, targets) {
+    try {
+        const actionUrl = (0, util_1.getGithubActionURL)(process.env);
+        await githubWrapper.createComment(pullRequest.number, [`Starting backport for target branches: ${targets.join(', ')}`, actionUrl]
+            .filter(Boolean)
+            .join('\n\n'));
+        // Mark PR body with backport targets
+        await githubWrapper.updatePullRequest(pullRequest.number, {
+            body: `${pullRequest.body}\n\n<!--ONMERGE ${JSON.stringify({
+                backportTargets: targets,
+            })} ONMERGE-->`,
+        });
+    }
+    catch (error) {
+        core.error(error);
+        core.setFailed(error.message);
+    }
+}
 if (require.main === module) {
     main().catch((error) => {
         console.error('An error occurred', error);
