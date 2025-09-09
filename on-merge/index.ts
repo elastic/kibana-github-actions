@@ -7,7 +7,15 @@ import { getGithubActionURL, getPrBackportData, getVersionLabels, labelsContain 
 import { parseVersions } from './versions';
 import { GithubWrapper } from './github';
 
-export async function main() {
+let workflowWasInterrupted = false;
+process.on('SIGTERM', () => {
+  if (!workflowWasInterrupted) {
+    core.warning('Workflow terminated. Finishing current tasks before exiting...');
+    workflowWasInterrupted = true;
+  }
+});
+
+async function main() {
   const { payload, repo } = context;
 
   if (!payload.pull_request) {
@@ -53,6 +61,18 @@ export async function main() {
     if (!targets.length) {
       core.info(`Backport skipped, because no backport targets found.`);
       return;
+    }
+
+    // Sleep for 15s to debounce multiple concurrent runs
+    core.info('Waiting 15s to debounce multiple concurrent runs...');
+    await new Promise((resolve) => setTimeout(resolve, 15000));
+    if (workflowWasInterrupted) {
+      core.warning('Workflow was interrupted. Exiting before starting backport...');
+      return;
+    } else {
+      core.info(
+        `Backporting to target branches: ${targets.join(', ')} based on labels: ${labelNames.join(', ')}`,
+      );
     }
 
     // Add comment about planned backports and update PR body with backport metadata

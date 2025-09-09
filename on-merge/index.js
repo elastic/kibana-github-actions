@@ -23,7 +23,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.main = void 0;
 const core = __importStar(require("@actions/core"));
 const github_1 = require("@actions/github");
 const backport_1 = require("backport");
@@ -31,6 +30,13 @@ const backportTargets_1 = require("./backportTargets");
 const util_1 = require("./util");
 const versions_1 = require("./versions");
 const github_2 = require("./github");
+let workflowWasInterrupted = false;
+process.on('SIGTERM', () => {
+    if (!workflowWasInterrupted) {
+        core.warning('Workflow terminated. Finishing current tasks before exiting...');
+        workflowWasInterrupted = true;
+    }
+});
 async function main() {
     const { payload, repo } = github_1.context;
     if (!payload.pull_request) {
@@ -68,6 +74,16 @@ async function main() {
             core.info(`Backport skipped, because no backport targets found.`);
             return;
         }
+        // Sleep for 15s to debounce multiple concurrent runs
+        core.info('Waiting 15s to debounce multiple concurrent runs...');
+        await new Promise((resolve) => setTimeout(resolve, 15000));
+        if (workflowWasInterrupted) {
+            core.warning('Workflow was interrupted. Exiting before starting backport...');
+            return;
+        }
+        else {
+            core.info(`Backporting to target branches: ${targets.join(', ')} based on labels: ${labelNames.join(', ')}`);
+        }
         // Add comment about planned backports and update PR body with backport metadata
         await updatePRWithBackportInfo(githubWrapper, pullRequest, targets);
         // Start backport for the calculated targets
@@ -102,7 +118,6 @@ async function main() {
         }
     }
 }
-exports.main = main;
 function isPRBackportToCurrentRelease(pullRequest, currentLabel) {
     return ((0, util_1.getVersionLabels)(pullRequest.labels).length === 1 &&
         (0, util_1.getVersionLabels)(pullRequest.labels)[0] === currentLabel &&
