@@ -1,7 +1,7 @@
 export interface Version {
   version: string;
   branch: string;
-  branchType: 'development' | 'release' | 'unmaintained';
+  branchType?: 'development' | 'release' | 'unmaintained';
 }
 
 export interface Versions {
@@ -23,8 +23,16 @@ export interface VersionMap {
 }
 
 export function parseVersions(versions: Versions): VersionsParsed {
+  const currentVersion =
+    versions.versions.find((v) => v.branchType === 'development') ||
+    versions.versions.find((v) => v.branch === 'main');
+
+  if (!currentVersion) {
+    throw new Error("Couldn't determine current version (no development or main branch found)");
+  }
+
   const parsed: VersionsParsed = {
-    current: versions.versions.find((v) => v.branchType === 'development')!,
+    current: currentVersion,
     all: versions.versions,
   };
 
