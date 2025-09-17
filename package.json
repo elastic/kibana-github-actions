@@ -8,7 +8,6 @@
     "test:integration": "jest",
     "test:unit": "mocha",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
     "build": "tsc",
     "lint": "eslint -c .eslintrc --fix --ext .ts .",
     "watch": "tsc --watch"

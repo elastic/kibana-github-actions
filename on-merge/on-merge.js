@@ -31,7 +31,6 @@ const backportTargets_1 = require("./backportTargets");
 const util_1 = require("./util");
 const versions_1 = require("./versions");
 const github_2 = require("./github");
-console.log('ON-MERGE being imported', github_1.context);
 async function main() {
     const { payload, repo } = github_1.context;
     if (!payload.pull_request) {

@@ -7,8 +7,6 @@ import { getGithubActionURL, getPrBackportData, getVersionLabels, labelsContain 
 import { parseVersions } from './versions';
 import { GithubWrapper } from './github';
 
-console.log('ON-MERGE being imported', context);
-
 export async function main() {
   const { payload, repo } = context;
 
