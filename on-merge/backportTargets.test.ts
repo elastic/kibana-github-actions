@@ -31,17 +31,26 @@ describe('backportTargets', () => {
     });
 
     it('should resolve version labels to their corresponding branches', () => {
-      const branches = resolveTargets(mockVersions, mockVersionMap, ['v7.17.2']);
+      const branches = resolveTargets(mockVersions, mockVersionMap, ['v7.17.2', 'backport:version']);
       expect(branches).to.eql(['7.x']);
     });
 
     it('should handle multiple version labels', () => {
-      const branches = resolveTargets(mockVersions, mockVersionMap, ['v8.4.1', 'v7.17.2']);
+      const branches = resolveTargets(mockVersions, mockVersionMap, [
+        'v8.4.1',
+        'v7.17.2',
+        'backport:version',
+      ]);
       expect(branches).to.eql(['7.x', '8.4']);
     });
 
     it('should ignore main branch versions', () => {
-      const branches = resolveTargets(mockVersions, mockVersionMap, ['v9.2.0']);
+      const branches = resolveTargets(mockVersions, mockVersionMap, ['v9.2.0', 'backport:version']);
+      expect(branches).to.eql([]);
+    });
+
+    it('should return empty array when backport:skip is present', () => {
+      const branches = resolveTargets(mockVersions, mockVersionMap, ['v8.4.1', 'backport:skip']);
       expect(branches).to.eql([]);
     });
   });

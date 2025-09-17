@@ -38,8 +38,10 @@ function resolveTargets(versions, versionToBranchMap, labelsOriginal) {
         });
     }
     else {
-        // Missing backport labels
-        throw new Error('No backport labels found, should be one of: ' + Object.values(exports.BACKPORT_LABELS).join(', '));
+        // Missing backport labels, but let's not error just now, we haven't been doing that
+        // throw new Error(
+        //   'No backport labels found, should be one of: ' + Object.values(BACKPORT_LABELS).join(', '),
+        // );
     }
     return [...targets].sort();
 }
