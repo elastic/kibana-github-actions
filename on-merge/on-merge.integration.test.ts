@@ -115,17 +115,17 @@ describe('On-Merge Action', () => {
   it('should throw an error if the payload is not a pull request', async () => {
     mockContext.payload.pull_request = null!;
 
-    const { main } = require('./on-merge');
+    const { main: runOnMergeAction } = require('./index');
 
-    await expect(main()).rejects.toThrow('Only pull_request events are supported.');
+    await expect(runOnMergeAction()).rejects.toThrow('Only pull_request events are supported.');
   });
 
   it('should throw an error if versions.json is missing development and main branches', async () => {
     mockOctokit.rest.repos.getContent.mockRejectedValueOnce(new Error('Not Found'));
 
-    const { main } = require('./on-merge');
+    const { main: runOnMergeAction } = require('./index');
 
-    await expect(main()).rejects.toThrow(/Not Found/);
+    await expect(runOnMergeAction()).rejects.toThrow(/Not Found/);
   });
 
   describe('Main branch PRs', () => {
@@ -138,9 +138,9 @@ describe('On-Merge Action', () => {
       // Setup: PR with current version label (v9.2.0) and backport:version
       mockContext.payload.pull_request.labels = [{ name: 'backport:version' }, { name: 'v9.2.0' }];
 
-      const { main } = require('./on-merge');
+      const { main: runOnMergeAction } = require('./index');
 
-      await main();
+      await runOnMergeAction();
 
       // Verify: should remove backport:version and add backport:skip
       expect(mockOctokit.rest.issues.removeLabel).toHaveBeenCalledWith({
@@ -162,9 +162,9 @@ describe('On-Merge Action', () => {
       // Setup: PR without current version label
       mockContext.payload.pull_request.labels = [{ name: 'backport:version' }, { name: 'v9.1.4' }];
 
-      const { main } = require('./on-merge');
+      const { main: runOnMergeAction } = require('./index');
 
-      await main();
+      await runOnMergeAction();
 
       // Verify: should add current version label
       expect(mockOctokit.rest.issues.addLabels).toHaveBeenCalledWith({
@@ -179,9 +179,9 @@ describe('On-Merge Action', () => {
       // Setup: PR with backport:skip label
       mockContext.payload.pull_request.labels = [{ name: 'v9.2.0' }, { name: 'backport:skip' }];
 
-      const { main } = require('./on-merge');
+      const { main: runOnMergeAction } = require('./index');
 
-      await main();
+      await runOnMergeAction();
 
       // Verify: backportRun should not be called
       expect(mockBackportRun).not.toHaveBeenCalled();
@@ -193,9 +193,9 @@ describe('On-Merge Action', () => {
       // Setup: PR with only current version label (no backport targets)
       mockContext.payload.pull_request.labels = [{ name: 'backport:version' }];
 
-      const { main } = require('./on-merge');
+      const { main: runOnMergeAction } = require('./index');
 
-      await main();
+      await runOnMergeAction();
 
       // Verify: backportRun should not be called
       expect(mockBackportRun).not.toHaveBeenCalled();
@@ -220,9 +220,9 @@ describe('On-Merge Action', () => {
         GITHUB_RUN_ID: '123456789',
       };
 
-      const { main } = require('./on-merge');
+      const { main: runOnMergeAction } = require('./index');
 
-      await main();
+      await runOnMergeAction();
 
       // Verify: should create comment with backport targets
       expect(mockOctokit.rest.issues.createComment).toHaveBeenCalledWith({
@@ -291,9 +291,9 @@ describe('On-Merge Action', () => {
         )[request.path];
       });
 
-      const { main } = require('./on-merge');
+      const { main: runOnMergeAction } = require('./index');
 
-      await main();
+      await runOnMergeAction();
 
       // Verify: should add version label to original PR
       expect(mockOctokit.rest.issues.addLabels).toHaveBeenCalledWith({
@@ -308,9 +308,9 @@ describe('On-Merge Action', () => {
       // Setup: backport PR without source PR data
       mockContext.payload.pull_request.body = 'Simple backport PR description';
 
-      const { main } = require('./on-merge');
+      const { main: runOnMergeAction } = require('./index');
 
-      await main();
+      await runOnMergeAction();
 
       // Verify: should not add any labels
       expect(mockOctokit.rest.issues.addLabels).not.toHaveBeenCalled();
