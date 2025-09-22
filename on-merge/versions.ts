@@ -23,12 +23,10 @@ export interface VersionMap {
 }
 
 export function parseVersions(versionsFile: Versions): VersionsParsed {
-  const currentVersion =
-    versionsFile.versions.find((v) => v.branchType === 'development') ||
-    versionsFile.versions.find((v) => v.branch === 'main');
+  const currentVersion = versionsFile.versions.find((v) => v.branch === 'main');
 
   if (!currentVersion) {
-    throw new Error("Couldn't determine current version (no development or main branch found)");
+    throw new Error("Couldn't determine current version (no main branch found)");
   }
 
   const parsed: VersionsParsed = {
