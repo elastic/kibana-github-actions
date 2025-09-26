@@ -4,7 +4,10 @@
   "description": "GitHub Actions used by Kibana",
   "scripts": {
     "postinstall": "[ \"$NODE_ENV\" = production ] && exit 0; husky install",
-    "test": "mocha",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:integration": "jest",
+    "test:unit": "mocha",
+    "test:watch": "jest --watch",
     "build": "tsc",
     "lint": "eslint -c .eslintrc --fix --ext .ts .",
     "watch": "tsc --watch"
@@ -38,10 +41,13 @@
     "yargs": "^15.3.1"
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
     "@octokit/webhooks-definitions": "^3.67.3",
     "@swc/core": "^1.2.197",
     "@swc/register": "^0.1.10",
     "@types/chai": "^4.3.11",
+    "@types/jest": "^29.5.8",
+    "@types/lodash": "^4.17.20",
     "@types/mocha": "^10.0.6",
     "@types/node": "^17.0.5",
     "@types/semver": "^7.3.10",
@@ -54,9 +60,12 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.2",
     "husky": "^6.0.0",
+    "jest": "^29.7.0",
+    "lodash": "^4.17.21",
     "mocha": "^10.2.0",
     "nock": "^13.4.0",
     "prettier": "3.1.1",
+    "ts-jest": "^29.1.1",
     "typescript": "^4.7.3"
   },
   "husky": {
