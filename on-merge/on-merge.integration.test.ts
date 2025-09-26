@@ -188,6 +188,24 @@ describe('On-Merge Action', () => {
       expect(mockOctokit.rest.issues.createComment).not.toHaveBeenCalled();
     });
 
+    it('does not remove backport:version when more version labels are present', async () => {
+      // Setup: PR with backport:version and multiple version labels
+      mockContext.payload.pull_request.labels = [
+        { name: 'backport:version' },
+        { name: 'v9.2.0' },
+        { name: 'v9.1.4' },
+      ];
+
+      const { main: runOnMergeAction } = require('./index');
+
+      await runOnMergeAction();
+
+      // Verify: should NOT remove backport:version label, there are valid backport targets
+      expect(mockOctokit.rest.issues.removeLabel).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'backport:version' }),
+      );
+    });
+
     // TODO: review this behavior - what should we do when backport:version is set but no targets set?
     it('should skip backport when no targets are found', async () => {
       // Setup: PR with only current version label (no backport targets)
