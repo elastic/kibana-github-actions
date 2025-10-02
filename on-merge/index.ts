@@ -7,16 +7,32 @@ import { getGithubActionURL, getPrBackportData, getVersionLabels, labelsContain 
 import { parseVersions } from './versions';
 import { GithubWrapper } from './github';
 
-let workflowWasInterrupted = false;
-process.on('SIGTERM', () => {
-  if (!workflowWasInterrupted) {
-    core.warning('Workflow terminated. Finishing current tasks before exiting...');
-    workflowWasInterrupted = true;
-  }
-});
+export const DEFAULT_DEBOUNCE_TIMEOUT = 15000;
 
-async function main() {
+const workflowState = {
+  wasInterrupted: false,
+  terminate: () => {
+    if (!workflowState.wasInterrupted) {
+      core.warning('Workflow terminated. Finishing current tasks before exiting...');
+      workflowState.wasInterrupted = true;
+    }
+  },
+};
+
+export async function main() {
+  process.on('SIGINT', workflowState.terminate);
+  process.on('SIGTERM', workflowState.terminate);
+
+  await runOnMergeAction().finally(() => {
+    process.off('SIGINT', workflowState.terminate);
+    process.off('SIGTERM', workflowState.terminate);
+  });
+}
+
+async function runOnMergeAction() {
   const { payload, repo } = context;
+  const debounceTimeout =
+    parseInt(process.env.BACKPORT_DEBOUNCE_TIMEOUT ?? '', 10) || DEFAULT_DEBOUNCE_TIMEOUT;
 
   if (!payload.pull_request) {
     throw Error('Only pull_request events are supported.');
@@ -63,10 +79,10 @@ async function main() {
       return;
     }
 
-    // Sleep for 15s to debounce multiple concurrent runs
-    core.info('Waiting 15s to debounce multiple concurrent runs...');
-    await new Promise((resolve) => setTimeout(resolve, 15000));
-    if (workflowWasInterrupted) {
+    // Sleep for debounceTimeout to debounce multiple concurrent runs
+    core.info(`Waiting ${(debounceTimeout / 1000).toFixed(1)}s to debounce multiple concurrent runs...`);
+    await new Promise((resolve) => setTimeout(resolve, debounceTimeout));
+    if (workflowState.wasInterrupted) {
       core.warning('Workflow was interrupted. Exiting before starting backport...');
       return;
     } else {
@@ -79,21 +95,43 @@ async function main() {
     await updatePRWithBackportInfo(githubWrapper, pullRequest, targets);
 
     // Start backport for the calculated targets
-    await backportRun({
-      options: {
-        repoOwner: repo.owner,
-        repoName: repo.repo,
-        accessToken,
-        interactive: false,
-        pullNumber: pullRequest.number,
-        assignees: [pullRequest.user.login],
-        autoMerge: true,
-        autoMergeMethod: 'squash',
-        targetBranches: targets,
-        publishStatusCommentOnFailure: true,
-        publishStatusCommentOnSuccess: true, // TODO this will flip to false once we have backport summaries implemented
-      },
-    });
+    try {
+      const result = await backportRun({
+        options: {
+          repoOwner: repo.owner,
+          repoName: repo.repo,
+          accessToken,
+          interactive: false,
+          pullNumber: pullRequest.number,
+          assignees: [pullRequest.user.login],
+          autoMerge: true,
+          autoMergeMethod: 'squash',
+          targetBranches: targets,
+          publishStatusCommentOnFailure: true,
+          publishStatusCommentOnSuccess: true, // TODO this will flip to false once we have backport summaries implemented
+        },
+      });
+      if (result.status === 'failure') {
+        if (typeof result.error === 'string') {
+          throw new Error(result.error);
+        } else if (result.error instanceof Error) {
+          throw result.error;
+        } else {
+          throw new Error('Backport failed for an unknown reason');
+        }
+      }
+    } catch (err) {
+      core.error('Backport failed');
+      core.setFailed(err.message);
+      githubWrapper
+        .createComment(
+          pullRequest.number,
+          `Backport failed. Please check the action logs for details. \n\n${getGithubActionURL(process.env)}`,
+        )
+        .catch(() => {
+          core.error('Failed to create comment on PR about backport failure');
+        });
+    }
   } else if (labelsContain(pullRequest.labels, 'backport')) {
     // Mark original PR with backport target labels
     const prData = getPrBackportData(pullRequest.body);

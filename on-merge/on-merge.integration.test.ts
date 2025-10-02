@@ -48,6 +48,15 @@ jest.mock('@actions/core', () => ({
   getInput: jest.fn(() => 'test-token'),
   setFailed: jest.fn(),
   setOutput: jest.fn(),
+  info: jest.fn((...argz) => {
+    console.log(...argz);
+  }),
+  warning: jest.fn((...argz) => {
+    console.warn(...argz);
+  }),
+  error: jest.fn((...argz) => {
+    console.error(...argz);
+  }),
 }));
 
 const mockBackportRun = jest.fn();
@@ -106,10 +115,13 @@ describe('On-Merge Action', () => {
       )[request.path];
     });
 
-    mockBackportRun.mockResolvedValue({ success: true } as any);
+    mockBackportRun.mockResolvedValue({ status: 'success' } as any);
 
     // Reset context to default state - now this should work since mockContext is a regular object
     Object.assign(mockContext, JSON.parse(JSON.stringify(defaultContext)));
+
+    // Set a quick debounce timeout for tests
+    process.env.BACKPORT_DEBOUNCE_TIMEOUT = '100';
   });
 
   it('should throw an error if the payload is not a pull request', async () => {
@@ -278,6 +290,68 @@ describe('On-Merge Action', () => {
       // Restore environment
       process.env = originalEnv;
     });
+
+    it('should handle backportRun failure gracefully', async () => {
+      // Setup: PR with version labels that resolve to backport targets
+      mockContext.payload.pull_request.labels = [
+        { name: 'backport:version' },
+        { name: 'v9.2.0' },
+        { name: 'v9.1.4' },
+      ];
+
+      mockBackportRun.mockResolvedValueOnce({
+        status: 'failure',
+        error: new Error('Backport failed'),
+      } as any);
+
+      const { main: runOnMergeAction } = require('./index');
+
+      await runOnMergeAction();
+
+      // Verify: should create comment about starting backport
+      expect(mockOctokit.rest.issues.createComment).toHaveBeenCalledWith({
+        owner: 'elastic',
+        repo: 'kibana',
+        issue_number: 12345,
+        body: expect.stringContaining('Starting backport for target branches: 9.1'),
+      });
+
+      // Verify: should call backportRun
+      expect(mockBackportRun).toHaveBeenCalled();
+
+      // Verify: should create comment about backport failure
+      expect(mockOctokit.rest.issues.createComment).toHaveBeenCalledWith({
+        owner: 'elastic',
+        repo: 'kibana',
+        issue_number: 12345,
+        body: expect.stringContaining('Backport failed'),
+      });
+    });
+
+    it('should not start backport if the process gets interrupted by SIGINT', async () => {
+      // Setup: PR with version labels that resolve to backport targets
+      mockContext.payload.pull_request.labels = [
+        { name: 'backport:version' },
+        { name: 'v9.2.0' },
+        { name: 'v9.1.4' },
+      ];
+
+      const { main: runOnMergeAction } = require('./index');
+
+      process.env.BACKPORT_DEBOUNCE_TIMEOUT = '500'; // increase debounce timeout to ensure we can send SIGINT in time
+      const actionPromise = runOnMergeAction();
+
+      // Simulate sending SIGINT shortly after starting the action
+      setTimeout(() => {
+        process.emit('SIGINT', 'SIGINT');
+      }, 50);
+
+      await actionPromise;
+
+      // Verify: backportRun should not be called
+      expect(mockBackportRun).not.toHaveBeenCalled();
+      expect(mockOctokit.rest.issues.createComment).not.toHaveBeenCalled();
+    });
   });
 
   describe('Backport PRs', () => {
@@ -291,7 +365,7 @@ describe('On-Merge Action', () => {
       // Setup: backport PR with source PR data in body
       const backportData = [
         {
-          sourcePullRequest: { number: 11111 },
+          sourcePullRequest: { number: 11111, labels: [] },
           sha: 'abc123',
         },
       ];

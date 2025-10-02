@@ -23,6 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.main = exports.DEFAULT_DEBOUNCE_TIMEOUT = void 0;
 const core = __importStar(require("@actions/core"));
 const github_1 = require("@actions/github");
 const backport_1 = require("backport");
@@ -30,15 +31,29 @@ const backportTargets_1 = require("./backportTargets");
 const util_1 = require("./util");
 const versions_1 = require("./versions");
 const github_2 = require("./github");
-let workflowWasInterrupted = false;
-process.on('SIGTERM', () => {
-    if (!workflowWasInterrupted) {
-        core.warning('Workflow terminated. Finishing current tasks before exiting...');
-        workflowWasInterrupted = true;
-    }
-});
+exports.DEFAULT_DEBOUNCE_TIMEOUT = 15000;
+const workflowState = {
+    wasInterrupted: false,
+    terminate: () => {
+        if (!workflowState.wasInterrupted) {
+            core.warning('Workflow terminated. Finishing current tasks before exiting...');
+            workflowState.wasInterrupted = true;
+        }
+    },
+};
 async function main() {
+    process.on('SIGINT', workflowState.terminate);
+    process.on('SIGTERM', workflowState.terminate);
+    await runOnMergeAction().finally(() => {
+        process.off('SIGINT', workflowState.terminate);
+        process.off('SIGTERM', workflowState.terminate);
+    });
+}
+exports.main = main;
+async function runOnMergeAction() {
+    var _a;
     const { payload, repo } = github_1.context;
+    const debounceTimeout = parseInt((_a = process.env.BACKPORT_DEBOUNCE_TIMEOUT) !== null && _a !== void 0 ? _a : '', 10) || exports.DEFAULT_DEBOUNCE_TIMEOUT;
     if (!payload.pull_request) {
         throw Error('Only pull_request events are supported.');
     }
@@ -74,10 +89,10 @@ async function main() {
             core.info(`Backport skipped, because no backport targets found.`);
             return;
         }
-        // Sleep for 15s to debounce multiple concurrent runs
-        core.info('Waiting 15s to debounce multiple concurrent runs...');
-        await new Promise((resolve) => setTimeout(resolve, 15000));
-        if (workflowWasInterrupted) {
+        // Sleep for debounceTimeout to debounce multiple concurrent runs
+        core.info(`Waiting ${(debounceTimeout / 1000).toFixed(1)}s to debounce multiple concurrent runs...`);
+        await new Promise((resolve) => setTimeout(resolve, debounceTimeout));
+        if (workflowState.wasInterrupted) {
             core.warning('Workflow was interrupted. Exiting before starting backport...');
             return;
         }
@@ -87,21 +102,43 @@ async function main() {
         // Add comment about planned backports and update PR body with backport metadata
         await updatePRWithBackportInfo(githubWrapper, pullRequest, targets);
         // Start backport for the calculated targets
-        await (0, backport_1.backportRun)({
-            options: {
-                repoOwner: repo.owner,
-                repoName: repo.repo,
-                accessToken,
-                interactive: false,
-                pullNumber: pullRequest.number,
-                assignees: [pullRequest.user.login],
-                autoMerge: true,
-                autoMergeMethod: 'squash',
-                targetBranches: targets,
-                publishStatusCommentOnFailure: true,
-                publishStatusCommentOnSuccess: true, // TODO this will flip to false once we have backport summaries implemented
-            },
-        });
+        try {
+            const result = await (0, backport_1.backportRun)({
+                options: {
+                    repoOwner: repo.owner,
+                    repoName: repo.repo,
+                    accessToken,
+                    interactive: false,
+                    pullNumber: pullRequest.number,
+                    assignees: [pullRequest.user.login],
+                    autoMerge: true,
+                    autoMergeMethod: 'squash',
+                    targetBranches: targets,
+                    publishStatusCommentOnFailure: true,
+                    publishStatusCommentOnSuccess: true, // TODO this will flip to false once we have backport summaries implemented
+                },
+            });
+            if (result.status === 'failure') {
+                if (typeof result.error === 'string') {
+                    throw new Error(result.error);
+                }
+                else if (result.error instanceof Error) {
+                    throw result.error;
+                }
+                else {
+                    throw new Error('Backport failed for an unknown reason');
+                }
+            }
+        }
+        catch (err) {
+            core.error('Backport failed');
+            core.setFailed(err.message);
+            githubWrapper
+                .createComment(pullRequest.number, `Backport failed. Please check the action logs for details. \n\n${(0, util_1.getGithubActionURL)(process.env)}`)
+                .catch(() => {
+                core.error('Failed to create comment on PR about backport failure');
+            });
+        }
     }
     else if ((0, util_1.labelsContain)(pullRequest.labels, 'backport')) {
         // Mark original PR with backport target labels
