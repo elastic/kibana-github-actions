@@ -28,7 +28,7 @@ inputs:
     description: 'Run the script without making changes'
     required: false
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'index.js'
 branding:
   icon: link
