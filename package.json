@@ -8,6 +8,7 @@
     "test:integration": "jest",
     "test:unit": "mocha",
     "test:watch": "jest --watch",
+    "pretest": "npm run build",
     "build": "tsc",
     "lint": "eslint -c .eslintrc --fix --ext .ts .",
     "watch": "tsc --watch"

@@ -6,6 +6,13 @@ type GithubOptions = {
   repo: string;
 };
 
+type HasNumber = {
+  number: number;
+};
+type HasLabels = {
+  labels: { name: string }[];
+};
+
 export class GithubWrapper {
   github: ReturnType<typeof getOctokit>['rest'];
   owner: string;
@@ -31,21 +38,31 @@ export class GithubWrapper {
     return content;
   }
 
-  async addLabels(issueNumber: number, labels: string[]) {
+  async addLabels(issue: HasNumber & HasLabels, labels: string[]) {
     const response = await this.github.issues.addLabels({
       owner: this.owner,
       repo: this.repo,
-      issue_number: issueNumber,
+      issue_number: issue.number,
       labels,
     });
+    for (const label of labels) {
+      if (!issue.labels.find((l) => l.name === label)) {
+        issue.labels.push({ name: label } as any);
+      }
+    }
     return response.data;
   }
 
-  removeLabel(prNumber: number, label: string) {
+  removeLabels(issue: HasNumber & HasLabels, labels: string[]) {
+    return Promise.all(labels.map((label) => this.removeLabel(issue, label)));
+  }
+
+  async removeLabel(issue: HasNumber & HasLabels, label: string) {
+    issue.labels = issue.labels.filter((l) => l.name !== label);
     return this.github.issues.removeLabel({
       owner: this.owner,
       repo: this.repo,
-      issue_number: prNumber,
+      issue_number: issue.number,
       name: label,
     });
   }

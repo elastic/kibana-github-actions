@@ -21,20 +21,29 @@ class GithubWrapper {
         }
         return content;
     }
-    async addLabels(issueNumber, labels) {
+    async addLabels(issue, labels) {
         const response = await this.github.issues.addLabels({
             owner: this.owner,
             repo: this.repo,
-            issue_number: issueNumber,
+            issue_number: issue.number,
             labels,
         });
+        for (const label of labels) {
+            if (!issue.labels.find((l) => l.name === label)) {
+                issue.labels.push({ name: label });
+            }
+        }
         return response.data;
     }
-    removeLabel(prNumber, label) {
+    removeLabels(issue, labels) {
+        return Promise.all(labels.map((label) => this.removeLabel(issue, label)));
+    }
+    async removeLabel(issue, label) {
+        issue.labels = issue.labels.filter((l) => l.name !== label);
         return this.github.issues.removeLabel({
             owner: this.owner,
             repo: this.repo,
-            issue_number: prNumber,
+            issue_number: issue.number,
             name: label,
         });
     }
