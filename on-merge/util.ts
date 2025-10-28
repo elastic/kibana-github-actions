@@ -1,6 +1,9 @@
 import { Commit } from 'backport';
 import axios from 'axios';
 import semver from 'semver';
+import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export function getPrBackportData(prBody: string | undefined | null) {
   const prDataMatch = prBody?.match(/<!--BACKPORT (.*?) BACKPORT-->/s);
@@ -57,4 +60,12 @@ export function getGithubActionURL(env: typeof process.env) {
     return `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`;
   }
   return '';
+}
+
+export function readBackportLogsIfPresent() {
+  const logPath = path.join(os.homedir(), '.backport', 'backport.debug.log');
+  if (fs.existsSync(logPath)) {
+    return fs.readFileSync(logPath, 'utf8');
+  }
+  return null;
 }

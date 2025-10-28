@@ -133,6 +133,15 @@ async function runOnMergeAction() {
         catch (err) {
             core.error('Backport failed');
             core.setFailed(err.message);
+            if (core.isDebug()) {
+                const log = (0, util_1.readBackportLogsIfPresent)();
+                if (log) {
+                    core.debug(`Backport debug log:\n${log}`);
+                }
+                else {
+                    core.debug('No backport log found at ~/.backport/backport.debug.log');
+                }
+            }
             githubWrapper
                 .createComment(pullRequest.number, `Backport failed. Please check the action logs for details. \n\n${(0, util_1.getGithubActionURL)(process.env)}`)
                 .catch(() => {

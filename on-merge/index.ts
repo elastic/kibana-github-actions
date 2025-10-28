@@ -3,7 +3,13 @@ import { context } from '@actions/github';
 import { PullRequestEvent } from '@octokit/webhooks-definitions/schema';
 import { backportRun } from 'backport';
 import { BACKPORT_LABELS, resolveTargets } from './backportTargets';
-import { getGithubActionURL, getPrBackportData, getVersionLabels, labelsContain } from './util';
+import {
+  getGithubActionURL,
+  getPrBackportData,
+  getVersionLabels,
+  labelsContain,
+  readBackportLogsIfPresent,
+} from './util';
 import { parseVersions } from './versions';
 import { GithubWrapper } from './github';
 
@@ -123,6 +129,15 @@ async function runOnMergeAction() {
     } catch (err) {
       core.error('Backport failed');
       core.setFailed(err.message);
+      if (core.isDebug()) {
+        const log = readBackportLogsIfPresent();
+        if (log) {
+          core.debug(`Backport debug log:\n${log}`);
+        } else {
+          core.debug('No backport log found at ~/.backport/backport.debug.log');
+        }
+      }
+
       githubWrapper
         .createComment(
           pullRequest.number,
