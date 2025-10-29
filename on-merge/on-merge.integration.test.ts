@@ -219,7 +219,7 @@ describe('On-Merge Action', () => {
     });
 
     // TODO: review this behavior - what should we do when backport:version is set but no targets set?
-    it('should skip backport when no targets are found', async () => {
+    it('should correct to backport:skip when no targets are found', async () => {
       // Setup: PR with only current version label (no backport targets)
       mockContext.payload.pull_request.labels = [{ name: 'backport:version' }];
 
@@ -230,6 +230,12 @@ describe('On-Merge Action', () => {
       // Verify: backportRun should not be called
       expect(mockBackportRun).not.toHaveBeenCalled();
       expect(mockOctokit.rest.issues.createComment).not.toHaveBeenCalled();
+      expect(mockOctokit.rest.issues.removeLabel).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'backport:version' }),
+      );
+      expect(mockOctokit.rest.issues.addLabels).toHaveBeenCalledWith(
+        expect.objectContaining({ labels: ['backport:skip'] }),
+      );
     });
 
     it('should run successful backport flow with valid targets', async () => {
