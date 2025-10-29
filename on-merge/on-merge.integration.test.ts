@@ -57,6 +57,7 @@ jest.mock('@actions/core', () => ({
   error: jest.fn((...argz) => {
     console.error(...argz);
   }),
+  isDebug: jest.fn(() => false),
 }));
 
 const mockBackportRun = jest.fn();
