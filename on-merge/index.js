@@ -67,8 +67,10 @@ async function runOnMergeAction() {
     const pullRequestPayload = payload;
     const pullRequest = pullRequestPayload.pull_request;
     if (pullRequest.base.ref === 'main') {
-        // Fix the backport:version label, if the only version label is the current version
-        if (isPRBackportToCurrentRelease(pullRequest, currentLabel)) {
+        // Fix the backport:version label, only when the PR is closed:
+        // - if the only version label is the current version, or no version labels => replace backport:version with backport:skip
+        if (payload.action !== 'labeled' &&
+            (isPRBackportToCurrentRelease(pullRequest, currentLabel) || hasBackportVersionWithNoTarget(pullRequest))) {
             await githubWrapper.removeLabels(pullRequest, [backportTargets_1.BACKPORT_LABELS.VERSION]);
             await githubWrapper.addLabels(pullRequest, [backportTargets_1.BACKPORT_LABELS.SKIP]);
             core.info("Adjusted labels: removing 'backport:version' and adding 'backport:skip'");
@@ -158,6 +160,10 @@ async function runOnMergeAction() {
 function isPRBackportToCurrentRelease(pullRequest, currentLabel) {
     return ((0, util_1.getVersionLabels)(pullRequest.labels).length === 1 &&
         (0, util_1.getVersionLabels)(pullRequest.labels)[0] === currentLabel &&
+        (0, util_1.labelsContain)(pullRequest.labels, backportTargets_1.BACKPORT_LABELS.VERSION));
+}
+function hasBackportVersionWithNoTarget(pullRequest) {
+    return ((0, util_1.getVersionLabels)(pullRequest.labels).length === 0 &&
         (0, util_1.labelsContain)(pullRequest.labels, backportTargets_1.BACKPORT_LABELS.VERSION));
 }
 async function updatePRWithBackportInfo(githubWrapper, pullRequest, targets) {
