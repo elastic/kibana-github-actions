@@ -60,8 +60,8 @@ const parsedCliArgs = (0, yargs_1.default)(process.argv.slice(2))
     .option('mapping', {
     alias: 'm',
     type: 'string',
-    describe: 'The mapping file to use',
-    default: 'mapping-sizes-and-impact.json',
+    describe: 'The mapping file to use (default: mapping-sizes-and-impact.json)',
+    // the default is defined in combineAndVerifyArgs to allow action inputs to override it
 })
     .option('repo', {
     alias: 'r',
@@ -135,6 +135,7 @@ function combineAndVerifyArgs(argsFromActionInputs, argsFromCli) {
     const defaults = {
         owner: tryGetOwnerFromContext(),
         issueNumber: [],
+        mapping: 'mapping-sizes-and-impact.json',
     };
     const combinedArgs = (0, utils_1.merge)((0, utils_1.merge)(defaults, argsFromActionInputs), argsFromCli);
     verifyExpectedArgs(combinedArgs);
