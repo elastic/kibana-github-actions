@@ -110,7 +110,9 @@ async function adjustSingleItemLabels(octokit, options) {
             continue;
         }
         const fieldName = Object.keys(fieldUpdate)[0];
-        const value = fieldUpdate[fieldName];
+        const configuration = fieldUpdate[fieldName];
+        const value = configuration && typeof configuration === 'object' ? configuration.value : configuration;
+        const canOverridePreviousValue = Boolean(configuration && typeof configuration === 'object' ? configuration.override : false);
         console.log('Finding option for value', { fieldName, value });
         // Get field id
         const optionForValue = await getOptionIdForValue(octokit, { projectNumber, fieldName, value, owner });
@@ -120,7 +122,7 @@ async function adjustSingleItemLabels(octokit, options) {
         // Check if the field is already set
         const existingField = issueNode.fieldValues.nodes.find((field) => field.__typename === 'ProjectV2ItemFieldSingleSelectValue' && field.field.name === fieldName);
         const fieldLookup = await getFieldLookupObj(octokit, { projectNumber, owner });
-        if (existingField) {
+        if (existingField && !canOverridePreviousValue) {
             const existingFieldValue = (_a = fieldLookup[fieldName]) === null || _a === void 0 ? void 0 : _a.options.find((e) => e.id === existingField.optionId);
             console.log(`Field "${fieldName}" is already set to "${existingFieldValue === null || existingFieldValue === void 0 ? void 0 : existingFieldValue.name}" (${existingField.optionId}), skipping update`);
             continue;
