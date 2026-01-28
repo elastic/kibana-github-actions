@@ -1,28 +1,52 @@
 {
   "loe:small": {
-    "Size": "🐇 Small (2-3d)"
+    "Size": {
+      "value": "🐇 Small (2-3d)",
+      "override": true
+    }
   },
   "loe:medium": {
-    "Size": "🐄 Medium (1-2w)"
+    "Size": {
+      "value": "🐄 Medium (1-2w)",
+      "override": true
+    }
   },
   "loe:large": {
-    "Size": "🐙 Large (2-4w)"
+    "Size": {
+      "value": "🐙 Large (2-4w)",
+      "override": true
+    }
   },
   "loe:x-large": {
-    "Size": "🐳 X-Large (>4w)"
+    "Size": {
+      "value": "🐳 X-Large (>4w)",
+      "override": true
+    }
   },
   "loe:needs-research": null,
   "impact:low": {
-    "Impact": "Low"
+    "Impact": {
+      "value": "Low",
+      "override": true
+    }
   },
   "impact:medium": {
-    "Impact": "Medium"
+    "Impact": {
+      "value": "Medium",
+      "override": true
+    }
   },
   "impact:high": {
-    "Impact": "High"
+    "Impact": {
+      "value": "High",
+      "override": true
+    }
   },
   "impact:critical": {
-    "Impact": "Critical"
+    "Impact": {
+      "value": "Critical",
+      "override": true
+    }
   },
   "impact:needs-assessment": null,
   "Feature:ES|QL": {
