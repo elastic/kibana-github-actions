@@ -130,7 +130,7 @@ async function adjustSingleItemLabels(
     projectNumber: number;
     projectId: string;
     dryRun: boolean;
-    mapping: Record<string, { [fieldName: string]: string } | null>;
+    mapping: Record<string, { [fieldName: string]: string | { value: string; override?: boolean } } | null>;
   },
 ) {
   const { issueNode, projectNumber, projectId, mapping, owner, dryRun } = options;
@@ -147,7 +147,11 @@ async function adjustSingleItemLabels(
     }
 
     const fieldName = Object.keys(fieldUpdate)[0];
-    const value = fieldUpdate[fieldName];
+    const configuration = fieldUpdate[fieldName];
+    const value = configuration && typeof configuration === 'object' ? configuration.value : configuration;
+    const canOverridePreviousValue = Boolean(
+      configuration && typeof configuration === 'object' ? configuration.override : false,
+    );
 
     console.log('Finding option for value', { fieldName, value });
 
@@ -164,7 +168,7 @@ async function adjustSingleItemLabels(
     );
 
     const fieldLookup = await getFieldLookupObj(octokit, { projectNumber, owner });
-    if (existingField) {
+    if (existingField && !canOverridePreviousValue) {
       const existingFieldValue = fieldLookup[fieldName]?.options.find((e) => e.id === existingField.optionId);
 
       console.log(

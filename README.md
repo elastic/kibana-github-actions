@@ -16,8 +16,10 @@ Created using https://github.com/microsoft/vscode-github-triage-actions as a fou
 # Install dependencies
 npm install
 
-# Run unit tests
+# Run all tests
 npm run test
+npm run test:integration # for integration tests only
+npm run test:unit # for unit tests only
 
 # Linting
 npm run lint

@@ -1,28 +1,106 @@
 {
   "loe:small": {
-    "Size": "🐇 Small (d)"
+    "Size": {
+      "value": "🐇 Small (2-3d)",
+      "override": true
+    }
   },
   "loe:medium": {
-    "Size": "🐄 Medium (w)"
+    "Size": {
+      "value": "🐄 Medium (1-2w)",
+      "override": true
+    }
   },
   "loe:large": {
-    "Size": "🐙 Large (m)"
+    "Size": {
+      "value": "🐙 Large (2-4w)",
+      "override": true
+    }
   },
   "loe:x-large": {
-    "Size": "🐳 X-Large"
+    "Size": {
+      "value": "🐳 X-Large (>4w)",
+      "override": true
+    }
   },
   "loe:needs-research": null,
   "impact:low": {
-    "Impact": "Low"
+    "Impact": {
+      "value": "Low",
+      "override": true
+    }
   },
   "impact:medium": {
-    "Impact": "Medium"
+    "Impact": {
+      "value": "Medium",
+      "override": true
+    }
   },
   "impact:high": {
-    "Impact": "High"
+    "Impact": {
+      "value": "High",
+      "override": true
+    }
   },
   "impact:critical": {
-    "Impact": "Critical"
+    "Impact": {
+      "value": "Critical",
+      "override": true
+    }
   },
-  "impact:needs-assessment": null
+  "impact:needs-assessment": null,
+  "Feature:ES|QL": {
+    "Project": "ES|QL"
+  },
+  "Feature:Alerting": {
+    "Project": "Alerting"
+  },
+  "Feature:Embeddables": {
+    "Project": "Embeddable"
+  },
+  "Feature:FieldFormatters": {
+    "Project": "Field Formatters"
+  },
+  "Feature:Data Views": {
+    "Project": "Data Views"
+  },
+  "Feature:BackgroundSearch": {
+    "Project": "Background search"
+  },
+  "Feature:Search": {
+    "Project": "Search"
+  },
+  "Project:OneDiscover": {
+    "Project": "One Discover"
+  },
+  "Feature:UnifiedDocViewer": {
+    "Project": "Unified Doc Viewer"
+  },
+  "Feature:UnifiedDataTable": {
+    "Project": "Unified Data Table"
+  },
+  "Feature:UnifiedFieldList": {
+    "Project": "Unified Field List"
+  },
+  "Feature:UnifiedHistogram": {
+    "Project": "Unified Histogram"
+  },
+  "Project:Accessibility": {
+    "Project": "A11y"
+  },
+  "performance": {
+    "Project": "Performance"
+  },
+  "technical debt": {
+    "Project": "Tech Debt"
+  },
+  "test-failure-flaky": {
+    "Project": "Test Failures"
+  },
+  "failed-test": {
+    "Project": "Test Failures"
+  },
+  "skipped-test": {
+    "Project": "Test Failures"
+  }
 }

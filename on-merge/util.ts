@@ -57,3 +57,25 @@ export function getVersionLabel(artifactsApiVersions: ArtifactsApiVersions, vers
 export function labelsContain(labels: { name: string }[], label: string) {
   return labels.some((l) => l.name.toLowerCase() === label.toLowerCase());
 }
+
+const VERSION_LABEL_REGEX = /^v\d+\.\d+\.\d+$/;
+export function getVersionLabels(labels: { name: string }[] | string[]) {
+  if (labels.length === 0) {
+    return [];
+  }
+
+  if (typeof labels[0] === 'string') {
+    return (labels as string[]).filter((name) => name.match(VERSION_LABEL_REGEX));
+  } else {
+    return (labels as { name: string }[])
+      .map((l) => l.name)
+      .filter((name) => name.match(VERSION_LABEL_REGEX));
+  }
+}
+
+export function getGithubActionURL(env: typeof process.env) {
+  if (env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID) {
+    return `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`;
+  }
+  return '';
+}

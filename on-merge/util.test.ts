@@ -1,5 +1,11 @@
 import { expect } from 'chai';
-import { getPrBackportData, labelsContain, getVersionLabel, ArtifactsApiVersions } from './util';
+import {
+  getPrBackportData,
+  labelsContain,
+  getVersionLabel,
+  getVersionLabels,
+  ArtifactsApiVersions,
+} from './util';
 
 describe('util', () => {
   describe('getPrBackportData', () => {
@@ -47,6 +53,37 @@ describe('util', () => {
 
     it('should increment version for a snapshot version', () => {
       expect(getVersionLabel(mockVersions, '1.0.0')).to.eql('v1.0.1');
+    });
+  });
+
+  describe('getVersionLabels', () => {
+    it('should return empty array for empty input', () => {
+      expect(getVersionLabels([])).to.eql([]);
+    });
+
+    it('should filter out non-version labels', () => {
+      const labels = [
+        { name: 'v1.2.3' },
+        { name: 'not-a-version' },
+        { name: 'v4.5.6' },
+        { name: 'another-label' },
+      ];
+      expect(getVersionLabels(labels)).to.eql(['v1.2.3', 'v4.5.6']);
+    });
+
+    it('should work with string array input', () => {
+      const labels = ['v1.2.3', 'not-a-version', 'v4.5.6'];
+      expect(getVersionLabels(labels)).to.eql(['v1.2.3', 'v4.5.6']);
+    });
+
+    it('should handle version labels with different formats', () => {
+      const labels = [
+        { name: 'v1.2.3' },
+        { name: 'v10.20.30' },
+        { name: 'v0.0.1' },
+        { name: 'v999.999.999' },
+      ];
+      expect(getVersionLabels(labels)).to.eql(['v1.2.3', 'v10.20.30', 'v0.0.1', 'v999.999.999']);
     });
   });
 });

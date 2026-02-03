@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.labelsContain = exports.getVersionLabel = exports.getArtifactsApiVersions = exports.getPrBackportData = exports.getPrPackageVersion = void 0;
+exports.getGithubActionURL = exports.getVersionLabels = exports.labelsContain = exports.getVersionLabel = exports.getArtifactsApiVersions = exports.getPrBackportData = exports.getPrPackageVersion = void 0;
 const axios_1 = __importDefault(require("axios"));
 const semver_1 = __importDefault(require("semver"));
 async function getPrPackageVersion(github, repoOwner, repoName, ref) {
@@ -42,4 +42,26 @@ function labelsContain(labels, label) {
     return labels.some((l) => l.name.toLowerCase() === label.toLowerCase());
 }
 exports.labelsContain = labelsContain;
+const VERSION_LABEL_REGEX = /^v\d+\.\d+\.\d+$/;
+function getVersionLabels(labels) {
+    if (labels.length === 0) {
+        return [];
+    }
+    if (typeof labels[0] === 'string') {
+        return labels.filter((name) => name.match(VERSION_LABEL_REGEX));
+    }
+    else {
+        return labels
+            .map((l) => l.name)
+            .filter((name) => name.match(VERSION_LABEL_REGEX));
+    }
+}
+exports.getVersionLabels = getVersionLabels;
+function getGithubActionURL(env) {
+    if (env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID) {
+        return `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`;
+    }
+    return '';
+}
+exports.getGithubActionURL = getGithubActionURL;
 //# sourceMappingURL=util.js.map

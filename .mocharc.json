@@ -1,6 +1,6 @@
 {
-  "extension": ["ts"],
-  "spec": "**/*.test.ts",
-  "ignore": ["**/node_modules/**"],
-  "require": "@swc/register"
+  "require": "@swc/register",
+  "spec": ["**/*.test.ts"],
+  "ignore": ["**/*.integration.test.ts", "**/node_modules/**"],
+  "timeout": 10000
 }

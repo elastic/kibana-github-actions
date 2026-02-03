@@ -1,10 +1,7 @@
 export interface Version {
   version: string;
   branch: string;
-  currentMajor?: boolean;
-  currentMinor?: boolean;
-  previousMinor?: boolean;
-  previousMajor?: boolean;
+  branchType?: 'development' | 'release' | 'unmaintained';
 }
 
 export interface Versions {
@@ -17,9 +14,7 @@ export interface VersionBranch {
 }
 
 export interface VersionsParsed {
-  currentMinor: Version;
-  previousMinor: Version;
-  previousMajor: Version;
+  current: Version;
   all: Version[];
 }
 
@@ -27,28 +22,16 @@ export interface VersionMap {
   [regex: string]: string;
 }
 
-export function parseVersions(versions: Versions): VersionsParsed {
-  const currentMinor = versions.versions.find((version) => version.currentMinor);
-  const previousMinor = versions.versions.find((version) => version.previousMinor);
-  const previousMajor = versions.versions.find((version) => version.previousMajor);
+export function parseVersions(versionsFile: Versions): VersionsParsed {
+  const currentVersion = versionsFile.versions.find((v) => v.branch === 'main');
 
-  if (!currentMinor) {
-    throw new Error('versions.json is missing current minor version information');
-  }
-
-  if (!previousMinor) {
-    throw new Error('versions.json is missing previous minor version information');
-  }
-
-  if (!previousMajor) {
-    throw new Error('versions.json is missing previous major version information');
+  if (!currentVersion) {
+    throw new Error("Couldn't determine current version (no main branch found)");
   }
 
   const parsed: VersionsParsed = {
-    currentMinor,
-    previousMinor,
-    previousMajor,
-    all: versions.versions,
+    current: currentVersion,
+    all: versionsFile.versions,
   };
 
   return parsed;
