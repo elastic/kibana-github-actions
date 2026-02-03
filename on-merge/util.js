@@ -3,21 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getGithubActionURL = exports.getVersionLabels = exports.labelsContain = exports.getVersionLabel = exports.getArtifactsApiVersions = exports.getPrBackportData = exports.getPrPackageVersion = void 0;
+exports.getGithubActionURL = exports.getVersionLabels = exports.labelsContain = exports.getVersionLabel = exports.getArtifactsApiVersions = exports.getPrBackportData = void 0;
 const axios_1 = __importDefault(require("axios"));
 const semver_1 = __importDefault(require("semver"));
-async function getPrPackageVersion(github, repoOwner, repoName, ref) {
-    const { data } = await github.repos.getContent({
-        owner: repoOwner,
-        repo: repoName,
-        ref: ref,
-        path: 'package.json',
-    });
-    const json = Buffer.from(data.content, 'base64').toString();
-    const { version } = JSON.parse(json);
-    return version;
-}
-exports.getPrPackageVersion = getPrPackageVersion;
 function getPrBackportData(prBody) {
     const prDataMatch = prBody === null || prBody === void 0 ? void 0 : prBody.match(/<!--BACKPORT (.*?) BACKPORT-->/s);
     if (prDataMatch === null || prDataMatch === void 0 ? void 0 : prDataMatch[1]) {

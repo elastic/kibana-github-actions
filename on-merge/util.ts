@@ -2,27 +2,6 @@ import { Commit } from 'backport';
 import axios from 'axios';
 import semver from 'semver';
 
-type Octokit = ReturnType<typeof import('@actions/github').getOctokit>;
-
-export async function getPrPackageVersion(
-  github: Octokit['rest'],
-  repoOwner: string,
-  repoName: string,
-  ref: string,
-) {
-  const { data } = await github.repos.getContent({
-    owner: repoOwner,
-    repo: repoName,
-    ref: ref,
-    path: 'package.json',
-  });
-
-  const json = Buffer.from((data as any).content, 'base64').toString();
-  const { version } = JSON.parse(json) as { version: string };
-
-  return version;
-}
-
 export function getPrBackportData(prBody: string | undefined | null) {
   const prDataMatch = prBody?.match(/<!--BACKPORT (.*?) BACKPORT-->/s);
   if (prDataMatch?.[1]) {
