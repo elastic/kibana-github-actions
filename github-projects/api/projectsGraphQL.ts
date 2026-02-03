@@ -1,6 +1,6 @@
 // Using reference: https://docs.github.com/en/graphql/reference/objects
 
-import { Octokit } from '@octokit/rest';
+import type { Octokit } from '../types';
 
 const MAX_BATCH_SIZE = 100;
 
