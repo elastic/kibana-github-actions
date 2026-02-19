@@ -2,11 +2,16 @@ import * as core from '@actions/core';
 import { context } from '@actions/github';
 import { PullRequestEvent } from '@octokit/webhooks-definitions/schema';
 import { backportRun } from 'backport';
-import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { BACKPORT_LABELS, resolveTargets } from './backportTargets';
-import { getGithubActionURL, getPrBackportData, getVersionLabels, labelsContain } from './util';
+import {
+  getGithubActionURL,
+  getPrBackportData,
+  getVersionLabels,
+  labelsContain,
+  tailFileToActions,
+} from './util';
 import { parseVersions } from './versions';
 import { GithubWrapper } from './github';
 
@@ -143,6 +148,9 @@ async function runOnMergeAction() {
     core.info(
       `[BACKPORT-RUN] Backport config: assignees=[${pullRequest.user.login}], autoMerge=true, autoMergeMethod=squash`,
     );
+    const logFilePath = path.join(os.tmpdir(), `backport-${pullRequest.number}.log`);
+    core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
+    const stopTailing = tailFileToActions(logFilePath);
     try {
       const result = await backportRun({
         options: {
@@ -150,6 +158,7 @@ async function runOnMergeAction() {
           repoName: repo.repo,
           accessToken,
           interactive: false,
+          logFilePath,
           pullNumber: pullRequest.number,
           assignees: [pullRequest.user.login],
           autoMerge: true,
@@ -159,6 +168,7 @@ async function runOnMergeAction() {
           publishStatusCommentOnSuccess: true, // TODO this will flip to false once we have backport summaries implemented
         },
       });
+      stopTailing();
       core.info(`[BACKPORT-RUN] Backport completed with status: ${result.status}`);
       if (result.status === 'failure') {
         core.error(`[BACKPORT-RUN] Backport failed with error type: ${typeof result.error}`);
@@ -172,6 +182,7 @@ async function runOnMergeAction() {
       }
       core.info('[SUCCESS] Backport process completed successfully');
     } catch (err) {
+      stopTailing();
       core.error(`[BACKPORT-ERROR] Backport failed for PR #${pullRequest.number}: ${err.message}`);
       core.error('[BACKPORT-ERROR] Full error:');
       core.error(err);
