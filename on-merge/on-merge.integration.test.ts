@@ -34,6 +34,7 @@ const mockContext = {
       base: { ref: 'main' },
       user: { login: 'test-user' },
       body: 'Default PR body',
+      head: { ref: 'test-branch' },
     },
   },
 };
@@ -73,6 +74,7 @@ const defaultContext = {
       base: { ref: 'main' },
       user: { login: 'test-user' },
       body: 'Default PR body',
+      head: { ref: 'test-branch' },
     },
   },
   eventName: 'pull_request',
@@ -283,6 +285,7 @@ describe('On-Merge Action', () => {
           repoName: 'kibana',
           accessToken: 'test-token',
           interactive: false,
+          logFilePath: expect.any(String),
           pullNumber: 12345,
           assignees: ['test-user'],
           autoMerge: true,
