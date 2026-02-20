@@ -150,7 +150,7 @@ async function runOnMergeAction() {
     );
     const logFilePath = path.join(os.tmpdir(), `backport-${pullRequest.number}.log`);
     core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
-    const stopTailing = tailFileToActions(logFilePath);
+    const stopTailing = tailFileToActions({ filePath: logFilePath, logger: core });
     try {
       const result = await backportRun({
         options: {

@@ -29,7 +29,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.tailFileToActions = exports.getGithubActionURL = exports.getVersionLabels = exports.labelsContain = exports.getVersionLabel = exports.getArtifactsApiVersions = exports.getPrBackportData = void 0;
 const axios_1 = __importDefault(require("axios"));
 const semver_1 = __importDefault(require("semver"));
-const core = __importStar(require("@actions/core"));
 const fs = __importStar(require("fs"));
 function getPrBackportData(prBody) {
     const prDataMatch = prBody === null || prBody === void 0 ? void 0 : prBody.match(/<!--BACKPORT (.*?) BACKPORT-->/s);
@@ -78,10 +77,11 @@ function getGithubActionURL(env) {
 }
 exports.getGithubActionURL = getGithubActionURL;
 /**
- * Tails a log file and forwards new lines to GitHub Actions output in real-time.
- * Returns a stop function that flushes remaining content and cleans up.
+ * Tails a log file and forwards new lines to the provided logger in real-time.
+ * Defaults to GitHub Actions core logger. Returns a stop function that flushes
+ * remaining content and cleans up.
  */
-function tailFileToActions(filePath, intervalMs = 1000) {
+function tailFileToActions({ filePath, intervalMs = 1000, logger, }) {
     let offset = 0;
     let buffer = '';
     let stopped = false;
@@ -118,17 +118,17 @@ function tailFileToActions(filePath, intervalMs = 1000) {
                 const meta = entry.metadata && Object.keys(entry.metadata).length ? JSON.stringify(entry.metadata) : '';
                 const formatted = [`[BACKPORT-LIB]`, ts, `[${level}]`, msg, meta].filter(Boolean).join(' ');
                 if (level === 'error') {
-                    core.error(formatted);
+                    logger.error(formatted);
                 }
                 else if (level === 'warn') {
-                    core.warning(formatted);
+                    logger.warning(formatted);
                 }
                 else {
-                    core.info(formatted);
+                    logger.info(formatted);
                 }
             }
             catch {
-                core.info(`[BACKPORT-LIB] ${line}`);
+                logger.info(`[BACKPORT-LIB] ${line}`);
             }
         }
     }
@@ -141,7 +141,7 @@ function tailFileToActions(filePath, intervalMs = 1000) {
         clearInterval(timer);
         flush();
         if (buffer.trim()) {
-            core.info(`[BACKPORT-LIB] ${buffer}`);
+            logger.info(`[BACKPORT-LIB] ${buffer}`);
             buffer = '';
         }
     };

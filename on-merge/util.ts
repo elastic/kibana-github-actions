@@ -1,7 +1,6 @@
 import { Commit } from 'backport';
 import axios from 'axios';
 import semver from 'semver';
-import * as core from '@actions/core';
 import * as fs from 'fs';
 
 export function getPrBackportData(prBody: string | undefined | null) {
@@ -61,11 +60,26 @@ export function getGithubActionURL(env: typeof process.env) {
   return '';
 }
 
+export interface TailLogger {
+  info(message: string): void;
+  warning(message: string): void;
+  error(message: string): void;
+}
+
 /**
- * Tails a log file and forwards new lines to GitHub Actions output in real-time.
- * Returns a stop function that flushes remaining content and cleans up.
+ * Tails a log file and forwards new lines to the provided logger in real-time.
+ * Defaults to GitHub Actions core logger. Returns a stop function that flushes
+ * remaining content and cleans up.
  */
-export function tailFileToActions(filePath: string, intervalMs = 1000): () => void {
+export function tailFileToActions({
+  filePath,
+  intervalMs = 1000,
+  logger,
+}: {
+  filePath: string;
+  intervalMs?: number;
+  logger: TailLogger;
+}): () => void {
   let offset = 0;
   let buffer = '';
   let stopped = false;
@@ -103,14 +117,14 @@ export function tailFileToActions(filePath: string, intervalMs = 1000): () => vo
           entry.metadata && Object.keys(entry.metadata).length ? JSON.stringify(entry.metadata) : '';
         const formatted = [`[BACKPORT-LIB]`, ts, `[${level}]`, msg, meta].filter(Boolean).join(' ');
         if (level === 'error') {
-          core.error(formatted);
+          logger.error(formatted);
         } else if (level === 'warn') {
-          core.warning(formatted);
+          logger.warning(formatted);
         } else {
-          core.info(formatted);
+          logger.info(formatted);
         }
       } catch {
-        core.info(`[BACKPORT-LIB] ${line}`);
+        logger.info(`[BACKPORT-LIB] ${line}`);
       }
     }
   }
@@ -124,7 +138,7 @@ export function tailFileToActions(filePath: string, intervalMs = 1000): () => vo
     clearInterval(timer);
     flush();
     if (buffer.trim()) {
-      core.info(`[BACKPORT-LIB] ${buffer}`);
+      logger.info(`[BACKPORT-LIB] ${buffer}`);
       buffer = '';
     }
   };
