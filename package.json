@@ -37,7 +37,6 @@
     "@actions/core": "^1.4.0",
     "@actions/exec": "^1.1.0",
     "@actions/github": "^5.0.0",
-    "@octokit/rest": "^18.6.7",
     "axios": "^1.13.4",
     "backport": "^9.6.6",
     "semver": "^7.3.7",
