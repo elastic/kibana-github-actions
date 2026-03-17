@@ -1,0 +1,46 @@
+name: 'LiteLLM Token'
+description: 'Mint and revoke short-lived LiteLLM keys for GitHub workflows'
+inputs:
+  operation:
+    description: 'Operation to perform: mint or revoke'
+    required: true
+  base-url:
+    description: 'LiteLLM management base URL'
+    required: true
+  master-key:
+    description: 'LiteLLM master/admin key used to manage virtual keys'
+    required: true
+  models:
+    description: 'Comma or newline separated models for mint operations'
+    required: false
+  duration:
+    description: 'TTL for minted keys, for example 15m or 1h'
+    required: false
+    default: '15m'
+  key-alias:
+    description: 'Optional key alias. When omitted for mint, a workflow-specific alias is generated'
+    required: false
+  metadata:
+    description: 'Optional JSON object merged into the LiteLLM metadata payload'
+    required: false
+  additional-payload:
+    description: 'Optional JSON object merged into the mint request body'
+    required: false
+  token-id:
+    description: 'Optional token id/hash to revoke'
+    required: false
+  api-key:
+    description: 'Optional API key to revoke or block as a fallback'
+    required: false
+outputs:
+  api_key:
+    description: 'The minted LiteLLM API key'
+  key_alias:
+    description: 'The LiteLLM key alias used for cleanup'
+  token_id:
+    description: 'The LiteLLM token id/hash returned by mint'
+  expires_at:
+    description: 'The expiration timestamp returned by LiteLLM'
+runs:
+  using: 'node20'
+  main: 'index.js'
