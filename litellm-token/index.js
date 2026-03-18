@@ -23,12 +23,14 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.run = void 0;
 const core = __importStar(require("@actions/core"));
 const litellmToken_1 = require("./litellmToken");
 async function run() {
     const operation = core.getInput('operation', { required: true }).trim().toLowerCase();
     const baseUrl = core.getInput('base-url', { required: true });
     const masterKey = core.getInput('master-key', { required: true });
+    maskSecret(masterKey);
     if (operation === 'mint') {
         const runtimeMetadata = (0, litellmToken_1.getGitHubRuntimeMetadata)(process.env);
         const explicitKeyAlias = core.getInput('key-alias');
@@ -58,24 +60,45 @@ async function run() {
         return;
     }
     if (operation === 'revoke') {
+        const keyAlias = getOptionalInput('key-alias');
+        const tokenId = getOptionalInput('token-id');
+        const apiKey = getOptionalInput('api-key');
+        maskSecret(apiKey);
+        maskSecret(tokenId);
         const result = await (0, litellmToken_1.revokeLiteLLMToken)({
             baseUrl,
             masterKey,
-            keyAlias: core.getInput('key-alias') || undefined,
-            tokenId: core.getInput('token-id') || undefined,
-            apiKey: core.getInput('api-key') || undefined,
+            keyAlias,
+            tokenId,
+            apiKey,
         });
         if (result.revoked) {
             core.info(`Revoked LiteLLM token${result.strategy ? ` using ${result.strategy}` : ''}.`);
             return;
         }
-        core.warning(`LiteLLM token cleanup did not confirm revocation${result.message ? `: ${result.message}` : '.'}`);
-        return;
+        throw new Error(`LiteLLM token cleanup did not confirm revocation${result.message ? `: ${result.message}` : '.'}`);
     }
     throw new Error(`Unsupported operation "${operation}". Expected "mint" or "revoke".`);
 }
-run().catch((error) => {
-    console.error('An error occurred', error);
-    core.setFailed(error.message);
-});
+exports.run = run;
+function getOptionalInput(name) {
+    const value = core.getInput(name);
+    return value || undefined;
+}
+function maskSecret(value) {
+    if (value) {
+        core.setSecret(value);
+    }
+}
+function getErrorMessage(error) {
+    if (error instanceof Error) {
+        return error.message;
+    }
+    return typeof error === 'string' ? error : 'Unexpected error';
+}
+if (require.main === module) {
+    run().catch((error) => {
+        core.setFailed(getErrorMessage(error));
+    });
+}
 //# sourceMappingURL=index.js.map

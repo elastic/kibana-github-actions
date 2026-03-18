@@ -5,6 +5,7 @@ export type JsonObject = Record<string, unknown>;
 type RuntimeEnv = Record<string, string | undefined>;
 type ReadUtf8File = (path: string) => string;
 const defaultReadUtf8File: ReadUtf8File = (path) => fs.readFileSync(path, 'utf8');
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export type MintInputs = {
   baseUrl: string;
@@ -137,13 +138,16 @@ export function buildMintRequestBody(inputs: MintInputs): JsonObject {
 }
 
 export async function mintLiteLLMToken(inputs: MintInputs): Promise<MintResult> {
-  const response = await axios.post(
-    getEndpointUrl(inputs.baseUrl, '/key/generate'),
-    buildMintRequestBody(inputs),
-    {
-      headers: buildHeaders(inputs.masterKey),
-    },
-  );
+  let response;
+  try {
+    response = await axios.post(
+      getEndpointUrl(inputs.baseUrl, '/key/generate'),
+      buildMintRequestBody(inputs),
+      buildRequestConfig(inputs.masterKey),
+    );
+  } catch (error) {
+    throw wrapAxiosError(error, 'LiteLLM mint failed');
+  }
 
   const data = ensureObject(response.data, 'LiteLLM mint response');
   const apiKey = getRequiredString(data.key, 'LiteLLM mint response key');
@@ -151,8 +155,8 @@ export async function mintLiteLLMToken(inputs: MintInputs): Promise<MintResult> 
   return {
     apiKey,
     keyAlias: getOptionalString(data.key_alias) ?? inputs.keyAlias,
-    tokenId: getOptionalString(data.token_id) ?? getOptionalString(data.token),
-    expiresAt: getOptionalString(data.expires_at) ?? getOptionalString(data.expires),
+    tokenId: getOptionalString(data.token_id),
+    expiresAt: getOptionalString(data.expires),
   };
 }
 
@@ -166,9 +170,11 @@ export async function revokeLiteLLMToken(inputs: RevokeInputs): Promise<RevokeRe
 
   for (const attempt of attempts) {
     try {
-      await axios.post(getEndpointUrl(inputs.baseUrl, attempt.endpoint), attempt.payload, {
-        headers: buildHeaders(inputs.masterKey),
-      });
+      await axios.post(
+        getEndpointUrl(inputs.baseUrl, attempt.endpoint),
+        attempt.payload,
+        buildRequestConfig(inputs.masterKey),
+      );
 
       return {
         revoked: true,
@@ -185,7 +191,7 @@ export async function revokeLiteLLMToken(inputs: RevokeInputs): Promise<RevokeRe
 
   return {
     revoked: false,
-    message: recoverableErrors[recoverableErrors.length - 1],
+    message: recoverableErrors.join(' | '),
   };
 }
 
@@ -195,13 +201,8 @@ function buildDeleteAttempts(inputs: RevokeInputs): DeleteAttempt[] {
   if (inputs.keyAlias) {
     attempts.push({
       endpoint: '/key/delete',
-      strategy: 'delete by key alias list',
-      payload: { key_aliases: [inputs.keyAlias] },
-    });
-    attempts.push({
-      endpoint: '/key/delete',
       strategy: 'delete by key alias',
-      payload: { key_alias: inputs.keyAlias },
+      payload: { key_aliases: [inputs.keyAlias] },
     });
   }
 
@@ -209,11 +210,6 @@ function buildDeleteAttempts(inputs: RevokeInputs): DeleteAttempt[] {
     attempts.push({
       endpoint: '/key/delete',
       strategy: 'delete by token id',
-      payload: { key: inputs.tokenId },
-    });
-    attempts.push({
-      endpoint: '/key/delete',
-      strategy: 'delete by token id list',
       payload: { keys: [inputs.tokenId] },
     });
   }
@@ -222,11 +218,6 @@ function buildDeleteAttempts(inputs: RevokeInputs): DeleteAttempt[] {
     attempts.push({
       endpoint: '/key/delete',
       strategy: 'delete by api key',
-      payload: { key: inputs.apiKey },
-    });
-    attempts.push({
-      endpoint: '/key/delete',
-      strategy: 'delete by api key list',
       payload: { keys: [inputs.apiKey] },
     });
     attempts.push({
@@ -236,19 +227,7 @@ function buildDeleteAttempts(inputs: RevokeInputs): DeleteAttempt[] {
     });
   }
 
-  return dedupeAttempts(attempts);
-}
-
-function dedupeAttempts(attempts: DeleteAttempt[]): DeleteAttempt[] {
-  const seen = new Set<string>();
-  return attempts.filter((attempt) => {
-    const key = `${attempt.endpoint}:${JSON.stringify(attempt.payload)}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
+  return attempts;
 }
 
 function getPullRequestNumber(env: RuntimeEnv, readFileSync: ReadUtf8File): number | undefined {
@@ -310,6 +289,13 @@ function buildHeaders(masterKey: string) {
   return {
     Authorization: `Bearer ${masterKey}`,
     'Content-Type': 'application/json',
+  };
+}
+
+function buildRequestConfig(masterKey: string) {
+  return {
+    headers: buildHeaders(masterKey),
+    timeout: REQUEST_TIMEOUT_MS,
   };
 }
 

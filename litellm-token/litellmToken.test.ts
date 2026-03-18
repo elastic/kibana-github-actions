@@ -1,3 +1,4 @@
+import axios, { AxiosError } from 'axios';
 import { expect } from 'chai';
 import nock from 'nock';
 
@@ -11,8 +12,12 @@ import {
   revokeLiteLLMToken,
 } from './litellmToken';
 
+const axiosWithMutablePost = axios as typeof axios & { post: typeof axios.post };
+const originalAxiosPost = axios.post;
+
 describe('litellmToken', () => {
   afterEach(() => {
+    axiosWithMutablePost.post = originalAxiosPost;
     nock.cleanAll();
   });
 
@@ -152,6 +157,72 @@ describe('litellmToken', () => {
         expiresAt: '2026-03-17T12:30:00Z',
       });
     });
+
+    it('ignores non-contract fallback fields in the mint response', async () => {
+      const baseUrl = 'https://litellm.example.com';
+
+      nock(baseUrl).post('/key/generate').matchHeader('authorization', 'Bearer sk-master').reply(200, {
+        key: 'sk-short-lived',
+        key_alias: 'gha-elastic-kibana-12345',
+        token: 'should-not-be-used',
+        expires_at: '2026-03-17T12:30:00Z',
+      });
+
+      const result = await mintLiteLLMToken({
+        baseUrl,
+        masterKey: 'sk-master',
+        models: ['llm-gateway/claude-opus-4-5'],
+        duration: '30m',
+        keyAlias: 'gha-elastic-kibana-12345',
+      });
+
+      expect(result).to.eql({
+        apiKey: 'sk-short-lived',
+        keyAlias: 'gha-elastic-kibana-12345',
+        tokenId: undefined,
+        expiresAt: undefined,
+      });
+    });
+
+    it('wraps mint transport failures without exposing the master key and sets a timeout', async () => {
+      let requestConfig: unknown;
+
+      axiosWithMutablePost.post = async (_url, _body, config) => {
+        requestConfig = config;
+
+        throw new AxiosError(
+          'Request failed',
+          'ERR_BAD_REQUEST',
+          {
+            headers: { Authorization: 'Bearer sk-master' },
+            timeout: 30_000,
+          } as any,
+          undefined,
+          {
+            status: 403,
+            data: { message: 'denied' },
+            statusText: 'Forbidden',
+            headers: {},
+            config: {} as any,
+          } as any,
+        );
+      };
+
+      try {
+        await mintLiteLLMToken({
+          baseUrl: 'https://litellm.example.com',
+          masterKey: 'sk-master',
+          models: ['llm-gateway/claude-opus-4-5'],
+          duration: '30m',
+        });
+        expect.fail('Expected mintLiteLLMToken to throw.');
+      } catch (error) {
+        expect((error as Error).message).to.equal('LiteLLM mint failed. HTTP 403: denied');
+        expect((error as Error).message).not.to.contain('sk-master');
+      }
+
+      expect(requestConfig).to.include({ timeout: 30_000 });
+    });
   });
 
   describe('revokeLiteLLMToken', () => {
@@ -160,10 +231,8 @@ describe('litellmToken', () => {
 
       nock(baseUrl)
         .post('/key/delete', { key_aliases: ['gha-elastic-kibana-12345'] })
-        .reply(400, { message: 'unsupported field shape' })
-        .post('/key/delete', { key_alias: 'gha-elastic-kibana-12345' })
         .reply(404, { message: 'key alias not found' })
-        .post('/key/delete', { key: 'token-hash-123' })
+        .post('/key/delete', { keys: ['token-hash-123'] })
         .reply(200, { deleted: true });
 
       const result = await revokeLiteLLMToken({
@@ -183,10 +252,8 @@ describe('litellmToken', () => {
       const baseUrl = 'https://litellm.example.com';
 
       nock(baseUrl)
-        .post('/key/delete', { key: 'sk-short-lived' })
-        .reply(404, { message: 'key not found' })
         .post('/key/delete', { keys: ['sk-short-lived'] })
-        .reply(400, { message: 'unsupported field shape' })
+        .reply(404, { message: 'key not found' })
         .post('/key/block', { key: 'sk-short-lived' })
         .reply(200, { blocked: true });
 
@@ -200,6 +267,59 @@ describe('litellmToken', () => {
         revoked: true,
         strategy: 'block by api key',
       });
+    });
+
+    it('joins all recoverable revoke errors when cleanup is not confirmed', async () => {
+      const baseUrl = 'https://litellm.example.com';
+
+      nock(baseUrl)
+        .post('/key/delete', { key_aliases: ['gha-elastic-kibana-12345'] })
+        .reply(404, { message: 'key alias not found' })
+        .post('/key/delete', { keys: ['token-hash-123'] })
+        .reply(404, { message: 'token id not found' })
+        .post('/key/delete', { keys: ['sk-short-lived'] })
+        .reply(404, { message: 'api key not found' })
+        .post('/key/block', { key: 'sk-short-lived' })
+        .reply(400, { message: 'already blocked' });
+
+      const result = await revokeLiteLLMToken({
+        baseUrl,
+        masterKey: 'sk-master',
+        keyAlias: 'gha-elastic-kibana-12345',
+        tokenId: 'token-hash-123',
+        apiKey: 'sk-short-lived',
+      });
+
+      expect(result).to.eql({
+        revoked: false,
+        message:
+          'delete by key alias: HTTP 404: key alias not found | ' +
+          'delete by token id: HTTP 404: token id not found | ' +
+          'delete by api key: HTTP 404: api key not found | ' +
+          'block by api key: HTTP 400: already blocked',
+      });
+    });
+
+    it('sets a timeout on revoke requests', async () => {
+      const requestConfigs: unknown[] = [];
+
+      axiosWithMutablePost.post = async (_url, _body, config) => {
+        requestConfigs.push(config);
+        return { data: { deleted: true } } as any;
+      };
+
+      const result = await revokeLiteLLMToken({
+        baseUrl: 'https://litellm.example.com',
+        masterKey: 'sk-master',
+        apiKey: 'sk-short-lived',
+      });
+
+      expect(result).to.eql({
+        revoked: true,
+        strategy: 'delete by api key',
+      });
+      expect(requestConfigs).to.have.length(1);
+      expect(requestConfigs[0]).to.include({ timeout: 30_000 });
     });
   });
 });

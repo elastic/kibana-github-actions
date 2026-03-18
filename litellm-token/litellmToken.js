@@ -30,6 +30,7 @@ exports.revokeLiteLLMToken = exports.mintLiteLLMToken = exports.buildMintRequest
 const axios_1 = __importDefault(require("axios"));
 const fs = __importStar(require("fs"));
 const defaultReadUtf8File = (path) => fs.readFileSync(path, 'utf8');
+const REQUEST_TIMEOUT_MS = 30000;
 function parseListInput(value) {
     return value
         .split(/[\n,]/)
@@ -108,17 +109,21 @@ function buildMintRequestBody(inputs) {
 }
 exports.buildMintRequestBody = buildMintRequestBody;
 async function mintLiteLLMToken(inputs) {
-    var _a, _b, _c;
-    const response = await axios_1.default.post(getEndpointUrl(inputs.baseUrl, '/key/generate'), buildMintRequestBody(inputs), {
-        headers: buildHeaders(inputs.masterKey),
-    });
+    var _a;
+    let response;
+    try {
+        response = await axios_1.default.post(getEndpointUrl(inputs.baseUrl, '/key/generate'), buildMintRequestBody(inputs), buildRequestConfig(inputs.masterKey));
+    }
+    catch (error) {
+        throw wrapAxiosError(error, 'LiteLLM mint failed');
+    }
     const data = ensureObject(response.data, 'LiteLLM mint response');
     const apiKey = getRequiredString(data.key, 'LiteLLM mint response key');
     return {
         apiKey,
         keyAlias: (_a = getOptionalString(data.key_alias)) !== null && _a !== void 0 ? _a : inputs.keyAlias,
-        tokenId: (_b = getOptionalString(data.token_id)) !== null && _b !== void 0 ? _b : getOptionalString(data.token),
-        expiresAt: (_c = getOptionalString(data.expires_at)) !== null && _c !== void 0 ? _c : getOptionalString(data.expires),
+        tokenId: getOptionalString(data.token_id),
+        expiresAt: getOptionalString(data.expires),
     };
 }
 exports.mintLiteLLMToken = mintLiteLLMToken;
@@ -130,9 +135,7 @@ async function revokeLiteLLMToken(inputs) {
     }
     for (const attempt of attempts) {
         try {
-            await axios_1.default.post(getEndpointUrl(inputs.baseUrl, attempt.endpoint), attempt.payload, {
-                headers: buildHeaders(inputs.masterKey),
-            });
+            await axios_1.default.post(getEndpointUrl(inputs.baseUrl, attempt.endpoint), attempt.payload, buildRequestConfig(inputs.masterKey));
             return {
                 revoked: true,
                 strategy: attempt.strategy,
@@ -147,7 +150,7 @@ async function revokeLiteLLMToken(inputs) {
     }
     return {
         revoked: false,
-        message: recoverableErrors[recoverableErrors.length - 1],
+        message: recoverableErrors.join(' | '),
     };
 }
 exports.revokeLiteLLMToken = revokeLiteLLMToken;
@@ -156,24 +159,14 @@ function buildDeleteAttempts(inputs) {
     if (inputs.keyAlias) {
         attempts.push({
             endpoint: '/key/delete',
-            strategy: 'delete by key alias list',
-            payload: { key_aliases: [inputs.keyAlias] },
-        });
-        attempts.push({
-            endpoint: '/key/delete',
             strategy: 'delete by key alias',
-            payload: { key_alias: inputs.keyAlias },
+            payload: { key_aliases: [inputs.keyAlias] },
         });
     }
     if (inputs.tokenId) {
         attempts.push({
             endpoint: '/key/delete',
             strategy: 'delete by token id',
-            payload: { key: inputs.tokenId },
-        });
-        attempts.push({
-            endpoint: '/key/delete',
-            strategy: 'delete by token id list',
             payload: { keys: [inputs.tokenId] },
         });
     }
@@ -181,11 +174,6 @@ function buildDeleteAttempts(inputs) {
         attempts.push({
             endpoint: '/key/delete',
             strategy: 'delete by api key',
-            payload: { key: inputs.apiKey },
-        });
-        attempts.push({
-            endpoint: '/key/delete',
-            strategy: 'delete by api key list',
             payload: { keys: [inputs.apiKey] },
         });
         attempts.push({
@@ -194,18 +182,7 @@ function buildDeleteAttempts(inputs) {
             payload: { key: inputs.apiKey },
         });
     }
-    return dedupeAttempts(attempts);
-}
-function dedupeAttempts(attempts) {
-    const seen = new Set();
-    return attempts.filter((attempt) => {
-        const key = `${attempt.endpoint}:${JSON.stringify(attempt.payload)}`;
-        if (seen.has(key)) {
-            return false;
-        }
-        seen.add(key);
-        return true;
-    });
+    return attempts;
 }
 function getPullRequestNumber(env, readFileSync) {
     var _a, _b;
@@ -254,6 +231,12 @@ function buildHeaders(masterKey) {
     return {
         Authorization: `Bearer ${masterKey}`,
         'Content-Type': 'application/json',
+    };
+}
+function buildRequestConfig(masterKey) {
+    return {
+        headers: buildHeaders(masterKey),
+        timeout: REQUEST_TIMEOUT_MS,
     };
 }
 function getEndpointUrl(baseUrl, path) {
