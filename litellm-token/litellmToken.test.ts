@@ -7,10 +7,9 @@ import {
   buildMintRequestBody,
   getGitHubRuntimeMetadata,
   mintLiteLLMToken,
-  parseListInput,
-  parseOptionalJsonObject,
   revokeLiteLLMToken,
 } from './litellmToken';
+import { mintInputSchema, revokeInputSchema } from './schema';
 
 const axiosWithMutablePost = axios as typeof axios & { post: typeof axios.post };
 const originalAxiosPost = axios.post;
@@ -20,28 +19,6 @@ describe('litellmToken', () => {
   afterEach(() => {
     axiosWithMutablePost.post = originalAxiosPost;
     nock.cleanAll();
-  });
-
-  describe('parseListInput', () => {
-    it('splits comma delimited values', () => {
-      expect(parseListInput('model-one, model-two, model-three')).to.eql([
-        'model-one',
-        'model-two',
-        'model-three',
-      ]);
-    });
-  });
-
-  describe('parseOptionalJsonObject', () => {
-    it('returns undefined for blank input', () => {
-      expect(parseOptionalJsonObject('   ', 'metadata')).to.equal(undefined);
-    });
-
-    it('throws for non-object JSON', () => {
-      expect(() => parseOptionalJsonObject('["bad"]', 'metadata')).to.throw(
-        'Input "metadata" must be a JSON object.',
-      );
-    });
   });
 
   describe('getGitHubRuntimeMetadata', () => {
@@ -107,14 +84,16 @@ describe('litellmToken', () => {
         process.env.GITHUB_SERVER_URL = 'https://github.com';
 
         expect(
-          buildMintRequestBody({
-            baseUrl: 'https://litellm.example.com',
-            masterKey: 'sk-master',
-            models: 'llm-gateway/claude-opus-4-5',
-            keyTTL: '30m',
-            maxBudget: '2.5',
-            metadata: '{"purpose":"claude-review"}',
-          }),
+          buildMintRequestBody(
+            mintInputSchema.parse({
+              baseUrl: 'https://litellm.example.com',
+              masterKey: 'sk-master',
+              models: 'llm-gateway/claude-opus-4-5',
+              keyTTL: '30m',
+              maxBudget: '2.5',
+              metadata: '{"purpose":"claude-review"}',
+            }),
+          ),
         ).to.eql({
           models: ['llm-gateway/claude-opus-4-5'],
           duration: '30m',
@@ -130,6 +109,82 @@ describe('litellmToken', () => {
         restoreEnvVar('GITHUB_REPOSITORY', originalEnv.GITHUB_REPOSITORY);
         restoreEnvVar('GITHUB_RUN_ID', originalEnv.GITHUB_RUN_ID);
         restoreEnvVar('GITHUB_SERVER_URL', originalEnv.GITHUB_SERVER_URL);
+      }
+    });
+  });
+
+  describe('mintInputSchema', () => {
+    it('normalizes trailing slashes in base-url', () => {
+      expect(
+        mintInputSchema.parse({
+          baseUrl: 'https://litellm.example.com///',
+          masterKey: 'sk-master',
+          models: 'llm-gateway/claude-opus-4-5',
+          keyTTL: '30m',
+          maxBudget: '2.5',
+        }).baseUrl,
+      ).to.equal('https://litellm.example.com');
+    });
+
+    it('throws when no models are provided', () => {
+      const result = mintInputSchema.safeParse({
+        baseUrl: 'https://litellm.example.com',
+        masterKey: 'sk-master',
+        models: ' ,  , ',
+        keyTTL: '30m',
+        maxBudget: '2.5',
+      });
+
+      expect(result.success).to.equal(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).to.equal('A mint operation requires at least one model.');
+      }
+    });
+
+    it('throws when metadata is not valid JSON', () => {
+      const result = mintInputSchema.safeParse({
+        baseUrl: 'https://litellm.example.com',
+        masterKey: 'sk-master',
+        models: 'llm-gateway/claude-opus-4-5',
+        keyTTL: '30m',
+        maxBudget: '2.5',
+        metadata: '{not-json}',
+      });
+
+      expect(result.success).to.equal(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).to.equal('Input "metadata" must be valid JSON.');
+      }
+    });
+
+    it('throws when metadata is not a JSON object', () => {
+      const result = mintInputSchema.safeParse({
+        baseUrl: 'https://litellm.example.com',
+        masterKey: 'sk-master',
+        models: 'llm-gateway/claude-opus-4-5',
+        keyTTL: '30m',
+        maxBudget: '2.5',
+        metadata: '["bad"]',
+      });
+
+      expect(result.success).to.equal(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).to.equal('Input "metadata" must be a JSON object.');
+      }
+    });
+
+    it('throws when max-budget is not a valid number', () => {
+      const result = mintInputSchema.safeParse({
+        baseUrl: 'https://litellm.example.com',
+        masterKey: 'sk-master',
+        models: 'llm-gateway/claude-opus-4-5',
+        keyTTL: '30m',
+        maxBudget: 'not-a-number',
+      });
+
+      expect(result.success).to.equal(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).to.equal('Input "max-budget" must be a valid number.');
       }
     });
   });
@@ -158,14 +213,16 @@ describe('litellmToken', () => {
             key: 'sk-short-lived',
           });
 
-        const apiKey = await mintLiteLLMToken({
-          baseUrl,
-          masterKey: 'sk-master',
-          models: 'llm-gateway/claude-opus-4-5',
-          keyTTL: '30m',
-          maxBudget: '2.5',
-          metadata: '{"purpose":"claude-review"}',
-        });
+        const apiKey = await mintLiteLLMToken(
+          mintInputSchema.parse({
+            baseUrl,
+            masterKey: 'sk-master',
+            models: 'llm-gateway/claude-opus-4-5',
+            keyTTL: '30m',
+            maxBudget: '2.5',
+            metadata: '{"purpose":"claude-review"}',
+          }),
+        );
 
         expect(requestBody).to.eql({
           models: ['llm-gateway/claude-opus-4-5'],
@@ -211,13 +268,15 @@ describe('litellmToken', () => {
       };
 
       try {
-        await mintLiteLLMToken({
-          baseUrl: 'https://litellm.example.com',
-          masterKey: 'sk-master',
-          models: 'llm-gateway/claude-opus-4-5',
-          keyTTL: '30m',
-          maxBudget: '5',
-        });
+        await mintLiteLLMToken(
+          mintInputSchema.parse({
+            baseUrl: 'https://litellm.example.com',
+            masterKey: 'sk-master',
+            models: 'llm-gateway/claude-opus-4-5',
+            keyTTL: '30m',
+            maxBudget: '5',
+          }),
+        );
         expect.fail('Expected mintLiteLLMToken to throw.');
       } catch (error) {
         expect((error as Error).message).to.equal('LiteLLM mint failed. HTTP 403: denied');
@@ -226,17 +285,42 @@ describe('litellmToken', () => {
 
       expect(requestConfig).to.include({ timeout: 30_000 });
     });
+    it('throws when the mint response is not a JSON object', async () => {
+      axiosWithMutablePost.post = async () => ({ data: ['bad-response'] }) as any;
 
-    it('throws when max-budget is not a valid number', () => {
-      expect(() =>
-        buildMintRequestBody({
-          baseUrl: 'https://litellm.example.com',
-          masterKey: 'sk-master',
-          models: 'llm-gateway/claude-opus-4-5',
-          keyTTL: '30m',
-          maxBudget: 'not-a-number',
-        }),
-      ).to.throw('Input "max-budget" must be a valid number.');
+      try {
+        await mintLiteLLMToken(
+          mintInputSchema.parse({
+            baseUrl: 'https://litellm.example.com',
+            masterKey: 'sk-master',
+            models: 'llm-gateway/claude-opus-4-5',
+            keyTTL: '30m',
+            maxBudget: '5',
+          }),
+        );
+        expect.fail('Expected mintLiteLLMToken to throw.');
+      } catch (error) {
+        expect((error as Error).message).to.equal('LiteLLM mint response was not a JSON object.');
+      }
+    });
+
+    it('throws when the mint response key is blank', async () => {
+      axiosWithMutablePost.post = async () => ({ data: { key: '   ' } }) as any;
+
+      try {
+        await mintLiteLLMToken(
+          mintInputSchema.parse({
+            baseUrl: 'https://litellm.example.com',
+            masterKey: 'sk-master',
+            models: 'llm-gateway/claude-opus-4-5',
+            keyTTL: '30m',
+            maxBudget: '5',
+          }),
+        );
+        expect.fail('Expected mintLiteLLMToken to throw.');
+      } catch (error) {
+        expect((error as Error).message).to.equal('LiteLLM mint response key was missing or empty.');
+      }
     });
   });
 
@@ -248,11 +332,13 @@ describe('litellmToken', () => {
         .post('/key/delete', { keys: ['sk-short-lived'] })
         .reply(200, { deleted: true });
 
-      await revokeLiteLLMToken({
-        baseUrl,
-        masterKey: 'sk-master',
-        apiKey: 'sk-short-lived',
-      });
+      await revokeLiteLLMToken(
+        revokeInputSchema.parse({
+          baseUrl,
+          masterKey: 'sk-master',
+          apiKey: 'sk-short-lived',
+        }),
+      );
     });
 
     it('blocks the api key when delete fails recoverably', async () => {
@@ -264,11 +350,13 @@ describe('litellmToken', () => {
         .post('/key/block', { key: 'sk-short-lived' })
         .reply(200, { blocked: true });
 
-      await revokeLiteLLMToken({
-        baseUrl,
-        masterKey: 'sk-master',
-        apiKey: 'sk-short-lived',
-      });
+      await revokeLiteLLMToken(
+        revokeInputSchema.parse({
+          baseUrl,
+          masterKey: 'sk-master',
+          apiKey: 'sk-short-lived',
+        }),
+      );
     });
 
     it('throws combined diagnostics when delete and block both fail recoverably', async () => {
@@ -281,11 +369,13 @@ describe('litellmToken', () => {
         .reply(400, { message: 'already blocked' });
 
       try {
-        await revokeLiteLLMToken({
-          baseUrl,
-          masterKey: 'sk-master',
-          apiKey: 'sk-short-lived',
-        });
+        await revokeLiteLLMToken(
+          revokeInputSchema.parse({
+            baseUrl,
+            masterKey: 'sk-master',
+            apiKey: 'sk-short-lived',
+          }),
+        );
         expect.fail('Expected revokeLiteLLMToken to throw.');
       } catch (error) {
         expect((error as Error).message).to.equal(
@@ -302,11 +392,13 @@ describe('litellmToken', () => {
         return { data: { deleted: true } } as any;
       };
 
-      await revokeLiteLLMToken({
-        baseUrl: 'https://litellm.example.com',
-        masterKey: 'sk-master',
-        apiKey: 'sk-short-lived',
-      });
+      await revokeLiteLLMToken(
+        revokeInputSchema.parse({
+          baseUrl: 'https://litellm.example.com',
+          masterKey: 'sk-master',
+          apiKey: 'sk-short-lived',
+        }),
+      );
 
       expect(requestConfigs).to.have.length(1);
       expect(requestConfigs[0]).to.include({ timeout: 30_000 });

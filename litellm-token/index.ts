@@ -1,22 +1,36 @@
 import * as core from '@actions/core';
 
+import { actionInputSchema } from './schema';
 import { mintLiteLLMToken, revokeLiteLLMToken } from './litellmToken';
 
 export async function run() {
-  const operation = core.getInput('operation', { required: true }).trim().toLowerCase();
-  const baseUrl = core.getInput('base-url', { required: true });
-  const masterKey = core.getInput('master-key', { required: true });
-  maskSecret(masterKey);
+  const rawInputs = {
+    operation: core.getInput('operation', { required: true }).trim().toLowerCase(),
+    baseUrl: core.getInput('base-url', { required: true }),
+    masterKey: core.getInput('master-key', { required: true }),
+    keyTTL: core.getInput('key-ttl') || '15m',
+    maxBudget: core.getInput('max-budget') || '5',
+    models: core.getInput('models'),
+    metadata: core.getInput('metadata') || undefined,
+    apiKey: core.getInput('api-key'),
+  };
 
-  if (operation === 'mint') {
-    const apiKey = await mintLiteLLMToken({
-      baseUrl,
-      masterKey,
-      keyTTL: core.getInput('key-ttl') || '15m',
-      maxBudget: core.getInput('max-budget') || '5',
-      models: core.getInput('models', { required: true }),
-      metadata: core.getInput('metadata'),
-    });
+  maskSecret(rawInputs.masterKey);
+  maskSecret(rawInputs.apiKey);
+
+  if (rawInputs.operation !== 'mint' && rawInputs.operation !== 'revoke') {
+    throw new Error(`Unsupported operation "${rawInputs.operation}". Expected "mint" or "revoke".`);
+  }
+
+  const parsedInputs = actionInputSchema.safeParse(rawInputs);
+  if (!parsedInputs.success) {
+    throw new Error(parsedInputs.error.issues[0]?.message ?? 'Invalid LiteLLM token inputs.');
+  }
+
+  const inputs = parsedInputs.data;
+
+  if (inputs.operation === 'mint') {
+    const apiKey = await mintLiteLLMToken(inputs);
 
     core.setSecret(apiKey);
     core.setOutput('api_key', apiKey);
@@ -24,22 +38,11 @@ export async function run() {
     return;
   }
 
-  if (operation === 'revoke') {
-    const apiKey = core.getInput('api-key', { required: true });
-
-    maskSecret(apiKey);
-
-    await revokeLiteLLMToken({
-      baseUrl,
-      masterKey,
-      apiKey,
-    });
+  if (inputs.operation === 'revoke') {
+    await revokeLiteLLMToken(inputs);
 
     core.info('Revoked LiteLLM token.');
-    return;
   }
-
-  throw new Error(`Unsupported operation "${operation}". Expected "mint" or "revoke".`);
 }
 
 function maskSecret(value: string | undefined) {

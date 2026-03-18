@@ -1,49 +1,15 @@
 import axios, { AxiosError } from 'axios';
 import * as fs from 'fs';
 
-export type JsonObject = Record<string, unknown>;
+import {
+  errorResponseSchema,
+  mintResponseSchema,
+  type JsonObject,
+  type MintInputs,
+  type RevokeInputs,
+} from './schema';
+
 const REQUEST_TIMEOUT_MS = 30_000;
-
-export type MintInputs = {
-  baseUrl: string;
-  masterKey: string;
-  models: string;
-  keyTTL: string;
-  maxBudget: string;
-  metadata?: string;
-};
-
-export type RevokeInputs = {
-  baseUrl: string;
-  masterKey: string;
-  apiKey: string;
-};
-
-export function parseListInput(value: string): string[] {
-  return value
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-}
-
-export function parseOptionalJsonObject(value: string, inputName: string): JsonObject | undefined {
-  if (!value.trim()) {
-    return undefined;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch (error) {
-    throw new Error(`Input "${inputName}" must be valid JSON.`);
-  }
-
-  if (!isJsonObject(parsed)) {
-    throw new Error(`Input "${inputName}" must be a JSON object.`);
-  }
-
-  return parsed;
-}
 
 export function getGitHubRuntimeMetadata(): JsonObject {
   const metadata: JsonObject = {};
@@ -65,22 +31,15 @@ export function getGitHubRuntimeMetadata(): JsonObject {
 }
 
 export function buildMintRequestBody(inputs: MintInputs): JsonObject {
-  const models = parseListInput(inputs.models);
-  if (models.length === 0) {
-    throw new Error('A mint operation requires at least one model.');
-  }
-  const maxBudget = parseNumberInput(inputs.maxBudget, 'max-budget');
-
   const requestBody: JsonObject = {
-    models,
+    models: inputs.models,
     duration: inputs.keyTTL,
-    max_budget: maxBudget,
+    max_budget: inputs.maxBudget,
   };
 
-  const metadata = parseOptionalJsonObject(inputs.metadata ?? '', 'metadata');
   const mergedMetadata = {
     ...getGitHubRuntimeMetadata(),
-    ...(metadata ?? {}),
+    ...(inputs.metadata ?? {}),
   };
 
   if (Object.keys(mergedMetadata).length > 0) {
@@ -94,7 +53,7 @@ export async function mintLiteLLMToken(inputs: MintInputs): Promise<string> {
   let response;
   try {
     response = await axios.post(
-      getEndpointUrl(inputs.baseUrl, '/key/generate'),
+      `${inputs.baseUrl}/key/generate`,
       buildMintRequestBody(inputs),
       buildRequestConfig(inputs.masterKey),
     );
@@ -102,14 +61,22 @@ export async function mintLiteLLMToken(inputs: MintInputs): Promise<string> {
     throw wrapAxiosError(error, 'LiteLLM mint failed');
   }
 
-  const data = ensureObject(response.data, 'LiteLLM mint response');
-  return getRequiredString(data.key, 'LiteLLM mint response key');
+  const parsedResponse = mintResponseSchema.safeParse(response.data);
+  if (!parsedResponse.success) {
+    throw new Error(
+      parsedResponse.error.issues[0]?.path[0] === 'key'
+        ? parsedResponse.error.issues[0]?.message ?? 'LiteLLM mint response key was missing or empty.'
+        : 'LiteLLM mint response was not a JSON object.',
+    );
+  }
+
+  return parsedResponse.data.key;
 }
 
 export async function revokeLiteLLMToken(inputs: RevokeInputs): Promise<void> {
   try {
     await axios.post(
-      getEndpointUrl(inputs.baseUrl, '/key/delete'),
+      `${inputs.baseUrl}/key/delete`,
       { keys: [inputs.apiKey] },
       buildRequestConfig(inputs.masterKey),
     );
@@ -123,7 +90,7 @@ export async function revokeLiteLLMToken(inputs: RevokeInputs): Promise<void> {
 
     try {
       await axios.post(
-        getEndpointUrl(inputs.baseUrl, '/key/block'),
+        `${inputs.baseUrl}/key/block`,
         { key: inputs.apiKey },
         buildRequestConfig(inputs.masterKey),
       );
@@ -189,39 +156,6 @@ function buildRequestConfig(masterKey: string) {
   };
 }
 
-function getEndpointUrl(baseUrl: string, path: string): string {
-  return `${baseUrl.replace(/\/+$/, '')}${path}`;
-}
-
-function ensureObject(value: unknown, label: string): JsonObject {
-  if (!isJsonObject(value)) {
-    throw new Error(`${label} was not a JSON object.`);
-  }
-
-  return value;
-}
-
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function getRequiredString(value: unknown, label: string): string {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(`${label} was missing or empty.`);
-  }
-
-  return value;
-}
-
-function parseNumberInput(value: string, inputName: string): number {
-  const parsedValue = Number.parseFloat(value);
-  if (!Number.isFinite(parsedValue)) {
-    throw new Error(`Input "${inputName}" must be a valid number.`);
-  }
-
-  return parsedValue;
-}
-
 function isRecoverableRevokeError(error: unknown): boolean {
   if (!axios.isAxiosError(error)) {
     return false;
@@ -234,12 +168,9 @@ function isRecoverableRevokeError(error: unknown): boolean {
 function formatAxiosError(error: AxiosError): string {
   const status = error.response?.status;
   const data = error.response?.data;
+  const parsedData = errorResponseSchema.safeParse(data);
   const responseMessage =
-    typeof data === 'string'
-      ? data
-      : isJsonObject(data) && typeof data.message === 'string'
-        ? data.message
-        : error.message;
+    typeof data === 'string' ? data : parsedData.success ? parsedData.data.message : error.message;
 
   return status ? `HTTP ${status}: ${responseMessage}` : responseMessage;
 }

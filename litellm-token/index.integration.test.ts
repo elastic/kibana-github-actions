@@ -47,14 +47,15 @@ describe('LiteLLM Token action', () => {
     expect(mockCore.setSecret).toHaveBeenCalledWith('sk-short-lived');
     expect(mockCore.setOutput).toHaveBeenCalledTimes(1);
     expect(mockCore.setOutput).toHaveBeenCalledWith('api_key', 'sk-short-lived');
-    expect(mockCore.getInput).toHaveBeenCalledWith('models', { required: true });
+    expect(mockCore.getInput).toHaveBeenCalledWith('models');
     expect(mockLitellmToken.mintLiteLLMToken).toHaveBeenCalledWith({
       baseUrl: 'https://litellm.example.com',
       masterKey: 'sk-master',
       keyTTL: '30m',
-      maxBudget: '5',
-      models: 'llm-gateway/claude-opus-4-5',
-      metadata: '{"purpose":"claude-review"}',
+      maxBudget: 5,
+      models: ['llm-gateway/claude-opus-4-5'],
+      metadata: { purpose: 'claude-review' },
+      operation: 'mint',
     });
   });
 
@@ -86,6 +87,7 @@ describe('LiteLLM Token action', () => {
       baseUrl: 'https://litellm.example.com',
       masterKey: 'sk-master',
       apiKey: 'sk-short-lived',
+      operation: 'revoke',
     });
   });
 });
