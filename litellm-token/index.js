@@ -35,10 +35,10 @@ async function run() {
         const apiKey = await (0, litellmToken_1.mintLiteLLMToken)({
             baseUrl,
             masterKey,
-            duration: core.getInput('duration') || '15m',
-            models: (0, litellmToken_1.parseListInput)(core.getInput('models', { required: true })),
-            metadata: (0, litellmToken_1.parseOptionalJsonObject)(core.getInput('metadata'), 'metadata'),
-            runtimeMetadata: (0, litellmToken_1.getGitHubRuntimeMetadata)(process.env),
+            keyTTL: core.getInput('key-ttl') || '15m',
+            maxBudget: core.getInput('max-budget') || '5',
+            models: core.getInput('models', { required: true }),
+            metadata: core.getInput('metadata'),
         });
         core.setSecret(apiKey);
         core.setOutput('api_key', apiKey);

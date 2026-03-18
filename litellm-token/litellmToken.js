@@ -71,19 +71,21 @@ function getGitHubRuntimeMetadata(env, readFileSync = defaultReadUtf8File) {
 }
 exports.getGitHubRuntimeMetadata = getGitHubRuntimeMetadata;
 function buildMintRequestBody(inputs) {
-    var _a, _b;
-    if (inputs.models.length === 0) {
+    var _a;
+    const models = parseListInput(inputs.models);
+    if (models.length === 0) {
         throw new Error('A mint operation requires at least one model.');
     }
+    const maxBudget = parseNumberInput(inputs.maxBudget, 'max-budget');
     const requestBody = {
-        models: inputs.models,
+        models,
+        duration: inputs.keyTTL,
+        max_budget: maxBudget,
     };
-    if (inputs.duration) {
-        requestBody.duration = inputs.duration;
-    }
+    const metadata = parseOptionalJsonObject((_a = inputs.metadata) !== null && _a !== void 0 ? _a : '', 'metadata');
     const mergedMetadata = {
-        ...((_a = inputs.runtimeMetadata) !== null && _a !== void 0 ? _a : {}),
-        ...((_b = inputs.metadata) !== null && _b !== void 0 ? _b : {}),
+        ...getGitHubRuntimeMetadata(process.env),
+        ...(metadata !== null && metadata !== void 0 ? metadata : {}),
     };
     if (Object.keys(mergedMetadata).length > 0) {
         requestBody.metadata = mergedMetadata;
@@ -175,6 +177,13 @@ function getRequiredString(value, label) {
         throw new Error(`${label} was missing or empty.`);
     }
     return value;
+}
+function parseNumberInput(value, inputName) {
+    const parsedValue = Number.parseFloat(value);
+    if (!Number.isFinite(parsedValue)) {
+        throw new Error(`Input "${inputName}" must be a valid number.`);
+    }
+    return parsedValue;
 }
 function isRecoverableRevokeError(error) {
     var _a;

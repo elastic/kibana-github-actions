@@ -71,23 +71,35 @@ describe('litellmToken', () => {
 
   describe('buildMintRequestBody', () => {
     it('merges runtime and explicit metadata into the mint payload', () => {
-      expect(
-        buildMintRequestBody({
-          baseUrl: 'https://litellm.example.com',
-          masterKey: 'sk-master',
+      const originalRepository = process.env.GITHUB_REPOSITORY;
+      try {
+        process.env.GITHUB_REPOSITORY = 'elastic/kibana';
+
+        expect(
+          buildMintRequestBody({
+            baseUrl: 'https://litellm.example.com',
+            masterKey: 'sk-master',
+            models: 'llm-gateway/claude-opus-4-5',
+            keyTTL: '30m',
+            maxBudget: '2.5',
+            metadata: '{"purpose":"claude-review"}',
+          }),
+        ).to.eql({
           models: ['llm-gateway/claude-opus-4-5'],
           duration: '30m',
-          runtimeMetadata: { github_repository: 'elastic/kibana' },
-          metadata: { purpose: 'claude-review' },
-        }),
-      ).to.eql({
-        models: ['llm-gateway/claude-opus-4-5'],
-        duration: '30m',
-        metadata: {
-          github_repository: 'elastic/kibana',
-          purpose: 'claude-review',
-        },
-      });
+          max_budget: 2.5,
+          metadata: {
+            github_repository: 'elastic/kibana',
+            purpose: 'claude-review',
+          },
+        });
+      } finally {
+        if (originalRepository === undefined) {
+          delete process.env.GITHUB_REPOSITORY;
+        } else {
+          process.env.GITHUB_REPOSITORY = originalRepository;
+        }
+      }
     });
   });
 
@@ -95,35 +107,46 @@ describe('litellmToken', () => {
     it('posts a mint request and returns the generated key details', async () => {
       const baseUrl = 'https://litellm.example.com';
       let requestBody: unknown;
+      const originalRepository = process.env.GITHUB_REPOSITORY;
+      try {
+        process.env.GITHUB_REPOSITORY = 'elastic/kibana';
 
-      nock(baseUrl)
-        .post('/key/generate', (body) => {
-          requestBody = body;
-          return true;
-        })
-        .matchHeader('authorization', 'Bearer sk-master')
-        .reply(200, {
-          key: 'sk-short-lived',
+        nock(baseUrl)
+          .post('/key/generate', (body) => {
+            requestBody = body;
+            return true;
+          })
+          .matchHeader('authorization', 'Bearer sk-master')
+          .reply(200, {
+            key: 'sk-short-lived',
+          });
+
+        const apiKey = await mintLiteLLMToken({
+          baseUrl,
+          masterKey: 'sk-master',
+          models: 'llm-gateway/claude-opus-4-5',
+          keyTTL: '30m',
+          maxBudget: '2.5',
+          metadata: '{"purpose":"claude-review"}',
         });
 
-      const apiKey = await mintLiteLLMToken({
-        baseUrl,
-        masterKey: 'sk-master',
-        models: ['llm-gateway/claude-opus-4-5'],
-        duration: '30m',
-        metadata: { purpose: 'claude-review' },
-        runtimeMetadata: { github_repository: 'elastic/kibana' },
-      });
-
-      expect(requestBody).to.eql({
-        models: ['llm-gateway/claude-opus-4-5'],
-        duration: '30m',
-        metadata: {
-          github_repository: 'elastic/kibana',
-          purpose: 'claude-review',
-        },
-      });
-      expect(apiKey).to.equal('sk-short-lived');
+        expect(requestBody).to.eql({
+          models: ['llm-gateway/claude-opus-4-5'],
+          duration: '30m',
+          max_budget: 2.5,
+          metadata: {
+            github_repository: 'elastic/kibana',
+            purpose: 'claude-review',
+          },
+        });
+        expect(apiKey).to.equal('sk-short-lived');
+      } finally {
+        if (originalRepository === undefined) {
+          delete process.env.GITHUB_REPOSITORY;
+        } else {
+          process.env.GITHUB_REPOSITORY = originalRepository;
+        }
+      }
     });
 
     it('wraps mint transport failures without exposing the master key and sets a timeout', async () => {
@@ -154,8 +177,9 @@ describe('litellmToken', () => {
         await mintLiteLLMToken({
           baseUrl: 'https://litellm.example.com',
           masterKey: 'sk-master',
-          models: ['llm-gateway/claude-opus-4-5'],
-          duration: '30m',
+          models: 'llm-gateway/claude-opus-4-5',
+          keyTTL: '30m',
+          maxBudget: '5',
         });
         expect.fail('Expected mintLiteLLMToken to throw.');
       } catch (error) {
@@ -164,6 +188,18 @@ describe('litellmToken', () => {
       }
 
       expect(requestConfig).to.include({ timeout: 30_000 });
+    });
+
+    it('throws when max-budget is not a valid number', () => {
+      expect(() =>
+        buildMintRequestBody({
+          baseUrl: 'https://litellm.example.com',
+          masterKey: 'sk-master',
+          models: 'llm-gateway/claude-opus-4-5',
+          keyTTL: '30m',
+          maxBudget: 'not-a-number',
+        }),
+      ).to.throw('Input "max-budget" must be a valid number.');
     });
   });
 

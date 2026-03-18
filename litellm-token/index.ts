@@ -1,12 +1,6 @@
 import * as core from '@actions/core';
 
-import {
-  getGitHubRuntimeMetadata,
-  mintLiteLLMToken,
-  parseListInput,
-  parseOptionalJsonObject,
-  revokeLiteLLMToken,
-} from './litellmToken';
+import { mintLiteLLMToken, revokeLiteLLMToken } from './litellmToken';
 
 export async function run() {
   const operation = core.getInput('operation', { required: true }).trim().toLowerCase();
@@ -18,10 +12,10 @@ export async function run() {
     const apiKey = await mintLiteLLMToken({
       baseUrl,
       masterKey,
-      duration: core.getInput('duration') || '15m',
-      models: parseListInput(core.getInput('models', { required: true })),
-      metadata: parseOptionalJsonObject(core.getInput('metadata'), 'metadata'),
-      runtimeMetadata: getGitHubRuntimeMetadata(process.env),
+      keyTTL: core.getInput('key-ttl') || '15m',
+      maxBudget: core.getInput('max-budget') || '5',
+      models: core.getInput('models', { required: true }),
+      metadata: core.getInput('metadata'),
     });
 
     core.setSecret(apiKey);

@@ -10,10 +10,7 @@ const mockCore = {
 };
 
 const mockLitellmToken = {
-  getGitHubRuntimeMetadata: jest.fn(() => ({ github_repository: 'elastic/kibana' })),
   mintLiteLLMToken: jest.fn(),
-  parseListInput: jest.fn(() => []),
-  parseOptionalJsonObject: jest.fn(() => undefined),
   revokeLiteLLMToken: jest.fn(),
 };
 
@@ -35,7 +32,7 @@ describe('LiteLLM Token action', () => {
       'base-url': 'https://litellm.example.com',
       'master-key': 'sk-master',
       models: 'llm-gateway/claude-opus-4-5',
-      duration: '30m',
+      'key-ttl': '30m',
       metadata: '{"purpose":"claude-review"}',
     });
 
@@ -54,10 +51,10 @@ describe('LiteLLM Token action', () => {
     expect(mockLitellmToken.mintLiteLLMToken).toHaveBeenCalledWith({
       baseUrl: 'https://litellm.example.com',
       masterKey: 'sk-master',
-      duration: '30m',
-      models: [],
-      metadata: undefined,
-      runtimeMetadata: { github_repository: 'elastic/kibana' },
+      keyTTL: '30m',
+      maxBudget: '5',
+      models: 'llm-gateway/claude-opus-4-5',
+      metadata: '{"purpose":"claude-review"}',
     });
   });
 

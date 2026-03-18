@@ -10,10 +10,10 @@ const REQUEST_TIMEOUT_MS = 30_000;
 export type MintInputs = {
   baseUrl: string;
   masterKey: string;
-  models: string[];
-  duration: string;
-  metadata?: JsonObject;
-  runtimeMetadata?: JsonObject;
+  models: string;
+  keyTTL: string;
+  maxBudget: string;
+  metadata?: string;
 };
 
 export type RevokeInputs = {
@@ -70,21 +70,22 @@ export function getGitHubRuntimeMetadata(
 }
 
 export function buildMintRequestBody(inputs: MintInputs): JsonObject {
-  if (inputs.models.length === 0) {
+  const models = parseListInput(inputs.models);
+  if (models.length === 0) {
     throw new Error('A mint operation requires at least one model.');
   }
+  const maxBudget = parseNumberInput(inputs.maxBudget, 'max-budget');
 
   const requestBody: JsonObject = {
-    models: inputs.models,
+    models,
+    duration: inputs.keyTTL,
+    max_budget: maxBudget,
   };
 
-  if (inputs.duration) {
-    requestBody.duration = inputs.duration;
-  }
-
+  const metadata = parseOptionalJsonObject(inputs.metadata ?? '', 'metadata');
   const mergedMetadata = {
-    ...(inputs.runtimeMetadata ?? {}),
-    ...(inputs.metadata ?? {}),
+    ...getGitHubRuntimeMetadata(process.env),
+    ...(metadata ?? {}),
   };
 
   if (Object.keys(mergedMetadata).length > 0) {
@@ -207,6 +208,15 @@ function getRequiredString(value: unknown, label: string): string {
   }
 
   return value;
+}
+
+function parseNumberInput(value: string, inputName: string): number {
+  const parsedValue = Number.parseFloat(value);
+  if (!Number.isFinite(parsedValue)) {
+    throw new Error(`Input "${inputName}" must be a valid number.`);
+  }
+
+  return parsedValue;
 }
 
 function isRecoverableRevokeError(error: unknown): boolean {
