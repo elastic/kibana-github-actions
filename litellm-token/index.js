@@ -32,59 +32,33 @@ async function run() {
     const masterKey = core.getInput('master-key', { required: true });
     maskSecret(masterKey);
     if (operation === 'mint') {
-        const runtimeMetadata = (0, litellmToken_1.getGitHubRuntimeMetadata)(process.env);
-        const explicitKeyAlias = core.getInput('key-alias');
-        const token = await (0, litellmToken_1.mintLiteLLMToken)({
+        const apiKey = await (0, litellmToken_1.mintLiteLLMToken)({
             baseUrl,
             masterKey,
             duration: core.getInput('duration') || '15m',
-            models: (0, litellmToken_1.parseListInput)(core.getInput('models')),
-            keyAlias: explicitKeyAlias || (0, litellmToken_1.buildDefaultKeyAlias)(runtimeMetadata),
+            models: (0, litellmToken_1.parseListInput)(core.getInput('models', { required: true })),
             metadata: (0, litellmToken_1.parseOptionalJsonObject)(core.getInput('metadata'), 'metadata'),
-            additionalPayload: (0, litellmToken_1.parseOptionalJsonObject)(core.getInput('additional-payload'), 'additional-payload'),
-            runtimeMetadata,
+            runtimeMetadata: (0, litellmToken_1.getGitHubRuntimeMetadata)(process.env),
         });
-        core.setSecret(token.apiKey);
-        core.setOutput('api_key', token.apiKey);
-        if (token.tokenId) {
-            core.setSecret(token.tokenId);
-            core.setOutput('token_id', token.tokenId);
-        }
-        if (token.keyAlias) {
-            core.setOutput('key_alias', token.keyAlias);
-        }
-        if (token.expiresAt) {
-            core.setOutput('expires_at', token.expiresAt);
-        }
-        core.info(`Minted LiteLLM token${token.keyAlias ? ` for alias ${token.keyAlias}` : ''}.`);
+        core.setSecret(apiKey);
+        core.setOutput('api_key', apiKey);
+        core.info('Minted LiteLLM token.');
         return;
     }
     if (operation === 'revoke') {
-        const keyAlias = getOptionalInput('key-alias');
-        const tokenId = getOptionalInput('token-id');
-        const apiKey = getOptionalInput('api-key');
+        const apiKey = core.getInput('api-key', { required: true });
         maskSecret(apiKey);
-        maskSecret(tokenId);
-        const result = await (0, litellmToken_1.revokeLiteLLMToken)({
+        await (0, litellmToken_1.revokeLiteLLMToken)({
             baseUrl,
             masterKey,
-            keyAlias,
-            tokenId,
             apiKey,
         });
-        if (result.revoked) {
-            core.info(`Revoked LiteLLM token${result.strategy ? ` using ${result.strategy}` : ''}.`);
-            return;
-        }
-        throw new Error(`LiteLLM token cleanup did not confirm revocation${result.message ? `: ${result.message}` : '.'}`);
+        core.info('Revoked LiteLLM token.');
+        return;
     }
     throw new Error(`Unsupported operation "${operation}". Expected "mint" or "revoke".`);
 }
 exports.run = run;
-function getOptionalInput(name) {
-    const value = core.getInput(name);
-    return value || undefined;
-}
 function maskSecret(value) {
     if (value) {
         core.setSecret(value);

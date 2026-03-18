@@ -26,14 +26,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.revokeLiteLLMToken = exports.mintLiteLLMToken = exports.buildMintRequestBody = exports.buildDefaultKeyAlias = exports.getGitHubRuntimeMetadata = exports.parseOptionalJsonObject = exports.parseListInput = void 0;
+exports.revokeLiteLLMToken = exports.mintLiteLLMToken = exports.buildMintRequestBody = exports.getGitHubRuntimeMetadata = exports.parseOptionalJsonObject = exports.parseListInput = void 0;
 const axios_1 = __importDefault(require("axios"));
 const fs = __importStar(require("fs"));
 const defaultReadUtf8File = (path) => fs.readFileSync(path, 'utf8');
 const REQUEST_TIMEOUT_MS = 30000;
 function parseListInput(value) {
     return value
-        .split(/[\n,]/)
+        .split(',')
         .map((entry) => entry.trim())
         .filter((entry) => entry.length > 0);
 }
@@ -70,37 +70,20 @@ function getGitHubRuntimeMetadata(env, readFileSync = defaultReadUtf8File) {
     return metadata;
 }
 exports.getGitHubRuntimeMetadata = getGitHubRuntimeMetadata;
-function buildDefaultKeyAlias(runtimeMetadata) {
-    const parts = [
-        'gha',
-        getAliasComponent(runtimeMetadata.github_repository),
-        getAliasComponent(runtimeMetadata.github_pull_request_number),
-        getAliasComponent(runtimeMetadata.github_run_id),
-        getAliasComponent(runtimeMetadata.github_run_attempt),
-    ].filter((part) => Boolean(part));
-    const alias = parts.join('-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    return alias.slice(0, 96) || 'gha-litellm-token';
-}
-exports.buildDefaultKeyAlias = buildDefaultKeyAlias;
 function buildMintRequestBody(inputs) {
-    var _a, _b, _c;
-    const requestBody = { ...((_a = inputs.additionalPayload) !== null && _a !== void 0 ? _a : {}) };
-    const payloadModels = getStringArray(requestBody.models);
-    const models = inputs.models.length > 0 ? inputs.models : payloadModels;
-    if (models.length === 0) {
+    var _a, _b;
+    if (inputs.models.length === 0) {
         throw new Error('A mint operation requires at least one model.');
     }
-    requestBody.models = models;
+    const requestBody = {
+        models: inputs.models,
+    };
     if (inputs.duration) {
         requestBody.duration = inputs.duration;
     }
-    if (inputs.keyAlias) {
-        requestBody.key_alias = inputs.keyAlias;
-    }
     const mergedMetadata = {
-        ...getNestedObject(requestBody.metadata),
-        ...((_b = inputs.runtimeMetadata) !== null && _b !== void 0 ? _b : {}),
-        ...((_c = inputs.metadata) !== null && _c !== void 0 ? _c : {}),
+        ...((_a = inputs.runtimeMetadata) !== null && _a !== void 0 ? _a : {}),
+        ...((_b = inputs.metadata) !== null && _b !== void 0 ? _b : {}),
     };
     if (Object.keys(mergedMetadata).length > 0) {
         requestBody.metadata = mergedMetadata;
@@ -109,7 +92,6 @@ function buildMintRequestBody(inputs) {
 }
 exports.buildMintRequestBody = buildMintRequestBody;
 async function mintLiteLLMToken(inputs) {
-    var _a;
     let response;
     try {
         response = await axios_1.default.post(getEndpointUrl(inputs.baseUrl, '/key/generate'), buildMintRequestBody(inputs), buildRequestConfig(inputs.masterKey));
@@ -118,72 +100,32 @@ async function mintLiteLLMToken(inputs) {
         throw wrapAxiosError(error, 'LiteLLM mint failed');
     }
     const data = ensureObject(response.data, 'LiteLLM mint response');
-    const apiKey = getRequiredString(data.key, 'LiteLLM mint response key');
-    return {
-        apiKey,
-        keyAlias: (_a = getOptionalString(data.key_alias)) !== null && _a !== void 0 ? _a : inputs.keyAlias,
-        tokenId: getOptionalString(data.token_id),
-        expiresAt: getOptionalString(data.expires),
-    };
+    return getRequiredString(data.key, 'LiteLLM mint response key');
 }
 exports.mintLiteLLMToken = mintLiteLLMToken;
 async function revokeLiteLLMToken(inputs) {
-    const attempts = buildDeleteAttempts(inputs);
-    const recoverableErrors = [];
-    if (attempts.length === 0) {
-        throw new Error('A revoke operation requires at least one of key-alias, token-id, or api-key.');
+    try {
+        await axios_1.default.post(getEndpointUrl(inputs.baseUrl, '/key/delete'), { keys: [inputs.apiKey] }, buildRequestConfig(inputs.masterKey));
+        return;
     }
-    for (const attempt of attempts) {
+    catch (deleteError) {
+        if (!isRecoverableRevokeError(deleteError)) {
+            throw wrapAxiosError(deleteError, 'LiteLLM revoke failed while deleting api key');
+        }
+        const deleteMessage = `delete by api key: ${formatAxiosError(deleteError)}`;
         try {
-            await axios_1.default.post(getEndpointUrl(inputs.baseUrl, attempt.endpoint), attempt.payload, buildRequestConfig(inputs.masterKey));
-            return {
-                revoked: true,
-                strategy: attempt.strategy,
-            };
+            await axios_1.default.post(getEndpointUrl(inputs.baseUrl, '/key/block'), { key: inputs.apiKey }, buildRequestConfig(inputs.masterKey));
+            return;
         }
-        catch (error) {
-            if (!isRecoverableDeleteError(error)) {
-                throw wrapAxiosError(error, `LiteLLM revoke failed while attempting ${attempt.strategy}`);
+        catch (blockError) {
+            if (!isRecoverableRevokeError(blockError)) {
+                throw wrapAxiosError(blockError, 'LiteLLM revoke failed while blocking api key');
             }
-            recoverableErrors.push(`${attempt.strategy}: ${formatAxiosError(error)}`);
+            throw new Error(`LiteLLM token cleanup did not confirm revocation: ${deleteMessage} | block by api key: ${formatAxiosError(blockError)}`);
         }
     }
-    return {
-        revoked: false,
-        message: recoverableErrors.join(' | '),
-    };
 }
 exports.revokeLiteLLMToken = revokeLiteLLMToken;
-function buildDeleteAttempts(inputs) {
-    const attempts = [];
-    if (inputs.keyAlias) {
-        attempts.push({
-            endpoint: '/key/delete',
-            strategy: 'delete by key alias',
-            payload: { key_aliases: [inputs.keyAlias] },
-        });
-    }
-    if (inputs.tokenId) {
-        attempts.push({
-            endpoint: '/key/delete',
-            strategy: 'delete by token id',
-            payload: { keys: [inputs.tokenId] },
-        });
-    }
-    if (inputs.apiKey) {
-        attempts.push({
-            endpoint: '/key/delete',
-            strategy: 'delete by api key',
-            payload: { keys: [inputs.apiKey] },
-        });
-        attempts.push({
-            endpoint: '/key/block',
-            strategy: 'block by api key',
-            payload: { key: inputs.apiKey },
-        });
-    }
-    return attempts;
-}
 function getPullRequestNumber(env, readFileSync) {
     var _a, _b;
     const eventPath = env.GITHUB_EVENT_PATH;
@@ -203,29 +145,6 @@ function assignIfSet(target, key, value) {
     if (value && value.trim().length > 0) {
         target[key] = value;
     }
-}
-function getAliasComponent(value) {
-    if (value === undefined || value === null) {
-        return undefined;
-    }
-    const normalized = String(value)
-        .trim()
-        .replace(/[^A-Za-z0-9._-]+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
-    return normalized || undefined;
-}
-function getStringArray(value) {
-    if (Array.isArray(value)) {
-        return value.filter((entry) => typeof entry === 'string' && entry.trim().length > 0);
-    }
-    if (typeof value === 'string') {
-        return parseListInput(value);
-    }
-    return [];
-}
-function getNestedObject(value) {
-    return isJsonObject(value) ? value : {};
 }
 function buildHeaders(masterKey) {
     return {
@@ -257,10 +176,7 @@ function getRequiredString(value, label) {
     }
     return value;
 }
-function getOptionalString(value) {
-    return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
-}
-function isRecoverableDeleteError(error) {
+function isRecoverableRevokeError(error) {
     var _a;
     if (!axios_1.default.isAxiosError(error)) {
         return false;

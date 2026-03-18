@@ -10,7 +10,6 @@ const mockCore = {
 };
 
 const mockLitellmToken = {
-  buildDefaultKeyAlias: jest.fn(() => 'gha-elastic-kibana-12345'),
   getGitHubRuntimeMetadata: jest.fn(() => ({ github_repository: 'elastic/kibana' })),
   mintLiteLLMToken: jest.fn(),
   parseListInput: jest.fn(() => []),
@@ -30,37 +29,65 @@ describe('LiteLLM Token action', () => {
     }
   });
 
+  it('masks the minted api key and only exposes api_key output', async () => {
+    Object.assign(mockInputs, {
+      operation: 'mint',
+      'base-url': 'https://litellm.example.com',
+      'master-key': 'sk-master',
+      models: 'llm-gateway/claude-opus-4-5',
+      duration: '30m',
+      metadata: '{"purpose":"claude-review"}',
+    });
+
+    mockLitellmToken.mintLiteLLMToken.mockResolvedValue('sk-short-lived');
+
+    const { run } = require('./index');
+
+    await run();
+
+    expect(mockCore.setSecret).toHaveBeenCalledTimes(2);
+    expect(mockCore.setSecret).toHaveBeenCalledWith('sk-master');
+    expect(mockCore.setSecret).toHaveBeenCalledWith('sk-short-lived');
+    expect(mockCore.setOutput).toHaveBeenCalledTimes(1);
+    expect(mockCore.setOutput).toHaveBeenCalledWith('api_key', 'sk-short-lived');
+    expect(mockCore.getInput).toHaveBeenCalledWith('models', { required: true });
+    expect(mockLitellmToken.mintLiteLLMToken).toHaveBeenCalledWith({
+      baseUrl: 'https://litellm.example.com',
+      masterKey: 'sk-master',
+      duration: '30m',
+      models: [],
+      metadata: undefined,
+      runtimeMetadata: { github_repository: 'elastic/kibana' },
+    });
+  });
+
   it('masks revoke secrets and fails when revocation is not confirmed', async () => {
     Object.assign(mockInputs, {
       operation: 'revoke',
       'base-url': 'https://litellm.example.com',
       'master-key': 'sk-master',
-      'key-alias': 'gha-elastic-kibana-12345',
-      'token-id': 'token-hash-123',
       'api-key': 'sk-short-lived',
     });
 
-    mockLitellmToken.revokeLiteLLMToken.mockResolvedValue({
-      revoked: false,
-      message: 'delete by token id: HTTP 404: token id not found',
-    });
+    mockLitellmToken.revokeLiteLLMToken.mockRejectedValue(
+      new Error(
+        'LiteLLM token cleanup did not confirm revocation: delete by api key: HTTP 404: api key not found | block by api key: HTTP 400: already blocked',
+      ),
+    );
 
     const { run } = require('./index');
 
     await expect(run()).rejects.toThrow(
-      'LiteLLM token cleanup did not confirm revocation: delete by token id: HTTP 404: token id not found',
+      'LiteLLM token cleanup did not confirm revocation: delete by api key: HTTP 404: api key not found | block by api key: HTTP 400: already blocked',
     );
 
-    expect(mockCore.setSecret).toHaveBeenCalledTimes(3);
+    expect(mockCore.setSecret).toHaveBeenCalledTimes(2);
     expect(mockCore.setSecret).toHaveBeenCalledWith('sk-master');
-    expect(mockCore.setSecret).toHaveBeenCalledWith('token-hash-123');
     expect(mockCore.setSecret).toHaveBeenCalledWith('sk-short-lived');
     expect(mockCore.warning).not.toHaveBeenCalled();
     expect(mockLitellmToken.revokeLiteLLMToken).toHaveBeenCalledWith({
       baseUrl: 'https://litellm.example.com',
       masterKey: 'sk-master',
-      keyAlias: 'gha-elastic-kibana-12345',
-      tokenId: 'token-hash-123',
       apiKey: 'sk-short-lived',
     });
   });

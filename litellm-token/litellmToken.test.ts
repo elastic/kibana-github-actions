@@ -3,7 +3,6 @@ import { expect } from 'chai';
 import nock from 'nock';
 
 import {
-  buildDefaultKeyAlias,
   buildMintRequestBody,
   getGitHubRuntimeMetadata,
   mintLiteLLMToken,
@@ -22,8 +21,8 @@ describe('litellmToken', () => {
   });
 
   describe('parseListInput', () => {
-    it('splits comma and newline delimited values', () => {
-      expect(parseListInput('model-one, model-two\nmodel-three')).to.eql([
+    it('splits comma delimited values', () => {
+      expect(parseListInput('model-one, model-two, model-three')).to.eql([
         'model-one',
         'model-two',
         'model-three',
@@ -70,42 +69,21 @@ describe('litellmToken', () => {
     });
   });
 
-  describe('buildDefaultKeyAlias', () => {
-    it('builds a stable workflow-specific alias', () => {
-      expect(
-        buildDefaultKeyAlias({
-          github_repository: 'elastic/kibana',
-          github_pull_request_number: 42,
-          github_run_id: '12345',
-          github_run_attempt: '2',
-        }),
-      ).to.equal('gha-elastic-kibana-42-12345-2');
-    });
-  });
-
   describe('buildMintRequestBody', () => {
-    it('merges metadata from the payload, runtime, and explicit metadata', () => {
+    it('merges runtime and explicit metadata into the mint payload', () => {
       expect(
         buildMintRequestBody({
           baseUrl: 'https://litellm.example.com',
           masterKey: 'sk-master',
           models: ['llm-gateway/claude-opus-4-5'],
           duration: '30m',
-          keyAlias: 'gha-elastic-kibana-12345',
-          additionalPayload: {
-            metadata: { existing: 'value' },
-            max_budget: 5,
-          },
           runtimeMetadata: { github_repository: 'elastic/kibana' },
           metadata: { purpose: 'claude-review' },
         }),
       ).to.eql({
         models: ['llm-gateway/claude-opus-4-5'],
         duration: '30m',
-        key_alias: 'gha-elastic-kibana-12345',
-        max_budget: 5,
         metadata: {
-          existing: 'value',
           github_repository: 'elastic/kibana',
           purpose: 'claude-review',
         },
@@ -126,17 +104,13 @@ describe('litellmToken', () => {
         .matchHeader('authorization', 'Bearer sk-master')
         .reply(200, {
           key: 'sk-short-lived',
-          key_alias: 'gha-elastic-kibana-12345',
-          token_id: 'token-hash-123',
-          expires: '2026-03-17T12:30:00Z',
         });
 
-      const result = await mintLiteLLMToken({
+      const apiKey = await mintLiteLLMToken({
         baseUrl,
         masterKey: 'sk-master',
         models: ['llm-gateway/claude-opus-4-5'],
         duration: '30m',
-        keyAlias: 'gha-elastic-kibana-12345',
         metadata: { purpose: 'claude-review' },
         runtimeMetadata: { github_repository: 'elastic/kibana' },
       });
@@ -144,44 +118,12 @@ describe('litellmToken', () => {
       expect(requestBody).to.eql({
         models: ['llm-gateway/claude-opus-4-5'],
         duration: '30m',
-        key_alias: 'gha-elastic-kibana-12345',
         metadata: {
           github_repository: 'elastic/kibana',
           purpose: 'claude-review',
         },
       });
-      expect(result).to.eql({
-        apiKey: 'sk-short-lived',
-        keyAlias: 'gha-elastic-kibana-12345',
-        tokenId: 'token-hash-123',
-        expiresAt: '2026-03-17T12:30:00Z',
-      });
-    });
-
-    it('ignores non-contract fallback fields in the mint response', async () => {
-      const baseUrl = 'https://litellm.example.com';
-
-      nock(baseUrl).post('/key/generate').matchHeader('authorization', 'Bearer sk-master').reply(200, {
-        key: 'sk-short-lived',
-        key_alias: 'gha-elastic-kibana-12345',
-        token: 'should-not-be-used',
-        expires_at: '2026-03-17T12:30:00Z',
-      });
-
-      const result = await mintLiteLLMToken({
-        baseUrl,
-        masterKey: 'sk-master',
-        models: ['llm-gateway/claude-opus-4-5'],
-        duration: '30m',
-        keyAlias: 'gha-elastic-kibana-12345',
-      });
-
-      expect(result).to.eql({
-        apiKey: 'sk-short-lived',
-        keyAlias: 'gha-elastic-kibana-12345',
-        tokenId: undefined,
-        expiresAt: undefined,
-      });
+      expect(apiKey).to.equal('sk-short-lived');
     });
 
     it('wraps mint transport failures without exposing the master key and sets a timeout', async () => {
@@ -226,29 +168,21 @@ describe('litellmToken', () => {
   });
 
   describe('revokeLiteLLMToken', () => {
-    it('falls back from alias deletion to token id deletion', async () => {
+    it('deletes the api key when delete succeeds', async () => {
       const baseUrl = 'https://litellm.example.com';
 
       nock(baseUrl)
-        .post('/key/delete', { key_aliases: ['gha-elastic-kibana-12345'] })
-        .reply(404, { message: 'key alias not found' })
-        .post('/key/delete', { keys: ['token-hash-123'] })
+        .post('/key/delete', { keys: ['sk-short-lived'] })
         .reply(200, { deleted: true });
 
-      const result = await revokeLiteLLMToken({
+      await revokeLiteLLMToken({
         baseUrl,
         masterKey: 'sk-master',
-        keyAlias: 'gha-elastic-kibana-12345',
-        tokenId: 'token-hash-123',
-      });
-
-      expect(result).to.eql({
-        revoked: true,
-        strategy: 'delete by token id',
+        apiKey: 'sk-short-lived',
       });
     });
 
-    it('falls back to blocking by api key when delete attempts fail recoverably', async () => {
+    it('blocks the api key when delete fails recoverably', async () => {
       const baseUrl = 'https://litellm.example.com';
 
       nock(baseUrl)
@@ -257,47 +191,34 @@ describe('litellmToken', () => {
         .post('/key/block', { key: 'sk-short-lived' })
         .reply(200, { blocked: true });
 
-      const result = await revokeLiteLLMToken({
+      await revokeLiteLLMToken({
         baseUrl,
         masterKey: 'sk-master',
         apiKey: 'sk-short-lived',
       });
-
-      expect(result).to.eql({
-        revoked: true,
-        strategy: 'block by api key',
-      });
     });
 
-    it('joins all recoverable revoke errors when cleanup is not confirmed', async () => {
+    it('throws combined diagnostics when delete and block both fail recoverably', async () => {
       const baseUrl = 'https://litellm.example.com';
 
       nock(baseUrl)
-        .post('/key/delete', { key_aliases: ['gha-elastic-kibana-12345'] })
-        .reply(404, { message: 'key alias not found' })
-        .post('/key/delete', { keys: ['token-hash-123'] })
-        .reply(404, { message: 'token id not found' })
         .post('/key/delete', { keys: ['sk-short-lived'] })
         .reply(404, { message: 'api key not found' })
         .post('/key/block', { key: 'sk-short-lived' })
         .reply(400, { message: 'already blocked' });
 
-      const result = await revokeLiteLLMToken({
-        baseUrl,
-        masterKey: 'sk-master',
-        keyAlias: 'gha-elastic-kibana-12345',
-        tokenId: 'token-hash-123',
-        apiKey: 'sk-short-lived',
-      });
-
-      expect(result).to.eql({
-        revoked: false,
-        message:
-          'delete by key alias: HTTP 404: key alias not found | ' +
-          'delete by token id: HTTP 404: token id not found | ' +
-          'delete by api key: HTTP 404: api key not found | ' +
-          'block by api key: HTTP 400: already blocked',
-      });
+      try {
+        await revokeLiteLLMToken({
+          baseUrl,
+          masterKey: 'sk-master',
+          apiKey: 'sk-short-lived',
+        });
+        expect.fail('Expected revokeLiteLLMToken to throw.');
+      } catch (error) {
+        expect((error as Error).message).to.equal(
+          'LiteLLM token cleanup did not confirm revocation: delete by api key: HTTP 404: api key not found | block by api key: HTTP 400: already blocked',
+        );
+      }
     });
 
     it('sets a timeout on revoke requests', async () => {
@@ -308,16 +229,12 @@ describe('litellmToken', () => {
         return { data: { deleted: true } } as any;
       };
 
-      const result = await revokeLiteLLMToken({
+      await revokeLiteLLMToken({
         baseUrl: 'https://litellm.example.com',
         masterKey: 'sk-master',
         apiKey: 'sk-short-lived',
       });
 
-      expect(result).to.eql({
-        revoked: true,
-        strategy: 'delete by api key',
-      });
       expect(requestConfigs).to.have.length(1);
       expect(requestConfigs[0]).to.include({ timeout: 30_000 });
     });
