@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { expect } from 'chai';
+import * as fs from 'fs';
 import nock from 'nock';
 
 import {
@@ -13,6 +14,7 @@ import {
 
 const axiosWithMutablePost = axios as typeof axios & { post: typeof axios.post };
 const originalAxiosPost = axios.post;
+const eventPath = '/tmp/litellm-token-event.json';
 
 describe('litellmToken', () => {
   afterEach(() => {
@@ -44,36 +46,65 @@ describe('litellmToken', () => {
 
   describe('getGitHubRuntimeMetadata', () => {
     it('reads workflow metadata and pull request number from the event payload', () => {
-      const metadata = getGitHubRuntimeMetadata(
-        {
-          GITHUB_REPOSITORY: 'elastic/kibana',
-          GITHUB_WORKFLOW: 'reviewer:claude',
-          GITHUB_RUN_ID: '12345',
-          GITHUB_RUN_ATTEMPT: '2',
-          GITHUB_ACTOR: 'reviewer-bot',
-          GITHUB_EVENT_NAME: 'pull_request_target',
-          GITHUB_EVENT_PATH: '/tmp/event.json',
-        },
-        () => JSON.stringify({ pull_request: { number: 42 } }),
-      );
+      const originalEnv = {
+        GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
+        GITHUB_WORKFLOW: process.env.GITHUB_WORKFLOW,
+        GITHUB_RUN_ID: process.env.GITHUB_RUN_ID,
+        GITHUB_RUN_ATTEMPT: process.env.GITHUB_RUN_ATTEMPT,
+        GITHUB_ACTOR: process.env.GITHUB_ACTOR,
+        GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,
+        GITHUB_EVENT_PATH: process.env.GITHUB_EVENT_PATH,
+        GITHUB_SERVER_URL: process.env.GITHUB_SERVER_URL,
+      };
 
-      expect(metadata).to.eql({
-        github_repository: 'elastic/kibana',
-        github_workflow: 'reviewer:claude',
-        github_run_id: '12345',
-        github_run_attempt: '2',
-        github_actor: 'reviewer-bot',
-        github_event_name: 'pull_request_target',
-        github_pull_request_number: 42,
-      });
+      try {
+        process.env.GITHUB_REPOSITORY = 'elastic/kibana';
+        process.env.GITHUB_WORKFLOW = 'reviewer:claude';
+        process.env.GITHUB_RUN_ID = '12345';
+        process.env.GITHUB_RUN_ATTEMPT = '2';
+        process.env.GITHUB_ACTOR = 'reviewer-bot';
+        process.env.GITHUB_EVENT_NAME = 'pull_request_target';
+        process.env.GITHUB_EVENT_PATH = eventPath;
+        process.env.GITHUB_SERVER_URL = 'https://github.com';
+        fs.writeFileSync(eventPath, JSON.stringify({ pull_request: { number: 42 } }));
+
+        const metadata = getGitHubRuntimeMetadata();
+
+        expect(metadata).to.eql({
+          github_repository: 'elastic/kibana',
+          github_workflow: 'reviewer:claude',
+          github_run_id: '12345',
+          github_run_attempt: '2',
+          github_actor: 'reviewer-bot',
+          github_event_name: 'pull_request_target',
+          github_workflow_run_url: 'https://github.com/elastic/kibana/actions/runs/12345',
+          github_pull_request_number: 42,
+        });
+      } finally {
+        restoreEnvVar('GITHUB_REPOSITORY', originalEnv.GITHUB_REPOSITORY);
+        restoreEnvVar('GITHUB_WORKFLOW', originalEnv.GITHUB_WORKFLOW);
+        restoreEnvVar('GITHUB_RUN_ID', originalEnv.GITHUB_RUN_ID);
+        restoreEnvVar('GITHUB_RUN_ATTEMPT', originalEnv.GITHUB_RUN_ATTEMPT);
+        restoreEnvVar('GITHUB_ACTOR', originalEnv.GITHUB_ACTOR);
+        restoreEnvVar('GITHUB_EVENT_NAME', originalEnv.GITHUB_EVENT_NAME);
+        restoreEnvVar('GITHUB_EVENT_PATH', originalEnv.GITHUB_EVENT_PATH);
+        restoreEnvVar('GITHUB_SERVER_URL', originalEnv.GITHUB_SERVER_URL);
+        fs.rmSync(eventPath, { force: true });
+      }
     });
   });
 
   describe('buildMintRequestBody', () => {
     it('merges runtime and explicit metadata into the mint payload', () => {
-      const originalRepository = process.env.GITHUB_REPOSITORY;
+      const originalEnv = {
+        GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
+        GITHUB_RUN_ID: process.env.GITHUB_RUN_ID,
+        GITHUB_SERVER_URL: process.env.GITHUB_SERVER_URL,
+      };
       try {
         process.env.GITHUB_REPOSITORY = 'elastic/kibana';
+        process.env.GITHUB_RUN_ID = '12345';
+        process.env.GITHUB_SERVER_URL = 'https://github.com';
 
         expect(
           buildMintRequestBody({
@@ -90,15 +121,15 @@ describe('litellmToken', () => {
           max_budget: 2.5,
           metadata: {
             github_repository: 'elastic/kibana',
+            github_run_id: '12345',
+            github_workflow_run_url: 'https://github.com/elastic/kibana/actions/runs/12345',
             purpose: 'claude-review',
           },
         });
       } finally {
-        if (originalRepository === undefined) {
-          delete process.env.GITHUB_REPOSITORY;
-        } else {
-          process.env.GITHUB_REPOSITORY = originalRepository;
-        }
+        restoreEnvVar('GITHUB_REPOSITORY', originalEnv.GITHUB_REPOSITORY);
+        restoreEnvVar('GITHUB_RUN_ID', originalEnv.GITHUB_RUN_ID);
+        restoreEnvVar('GITHUB_SERVER_URL', originalEnv.GITHUB_SERVER_URL);
       }
     });
   });
@@ -107,9 +138,15 @@ describe('litellmToken', () => {
     it('posts a mint request and returns the generated key details', async () => {
       const baseUrl = 'https://litellm.example.com';
       let requestBody: unknown;
-      const originalRepository = process.env.GITHUB_REPOSITORY;
+      const originalEnv = {
+        GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
+        GITHUB_RUN_ID: process.env.GITHUB_RUN_ID,
+        GITHUB_SERVER_URL: process.env.GITHUB_SERVER_URL,
+      };
       try {
         process.env.GITHUB_REPOSITORY = 'elastic/kibana';
+        process.env.GITHUB_RUN_ID = '12345';
+        process.env.GITHUB_SERVER_URL = 'https://github.com';
 
         nock(baseUrl)
           .post('/key/generate', (body) => {
@@ -136,16 +173,16 @@ describe('litellmToken', () => {
           max_budget: 2.5,
           metadata: {
             github_repository: 'elastic/kibana',
+            github_run_id: '12345',
+            github_workflow_run_url: 'https://github.com/elastic/kibana/actions/runs/12345',
             purpose: 'claude-review',
           },
         });
         expect(apiKey).to.equal('sk-short-lived');
       } finally {
-        if (originalRepository === undefined) {
-          delete process.env.GITHUB_REPOSITORY;
-        } else {
-          process.env.GITHUB_REPOSITORY = originalRepository;
-        }
+        restoreEnvVar('GITHUB_REPOSITORY', originalEnv.GITHUB_REPOSITORY);
+        restoreEnvVar('GITHUB_RUN_ID', originalEnv.GITHUB_RUN_ID);
+        restoreEnvVar('GITHUB_SERVER_URL', originalEnv.GITHUB_SERVER_URL);
       }
     });
 
@@ -276,3 +313,12 @@ describe('litellmToken', () => {
     });
   });
 });
+
+function restoreEnvVar(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
+}

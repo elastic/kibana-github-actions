@@ -2,9 +2,6 @@ import axios, { AxiosError } from 'axios';
 import * as fs from 'fs';
 
 export type JsonObject = Record<string, unknown>;
-type RuntimeEnv = Record<string, string | undefined>;
-type ReadUtf8File = (path: string) => string;
-const defaultReadUtf8File: ReadUtf8File = (path) => fs.readFileSync(path, 'utf8');
 const REQUEST_TIMEOUT_MS = 30_000;
 
 export type MintInputs = {
@@ -48,20 +45,18 @@ export function parseOptionalJsonObject(value: string, inputName: string): JsonO
   return parsed;
 }
 
-export function getGitHubRuntimeMetadata(
-  env: RuntimeEnv,
-  readFileSync: ReadUtf8File = defaultReadUtf8File,
-): JsonObject {
+export function getGitHubRuntimeMetadata(): JsonObject {
   const metadata: JsonObject = {};
 
-  assignIfSet(metadata, 'github_repository', env.GITHUB_REPOSITORY);
-  assignIfSet(metadata, 'github_workflow', env.GITHUB_WORKFLOW);
-  assignIfSet(metadata, 'github_run_id', env.GITHUB_RUN_ID);
-  assignIfSet(metadata, 'github_run_attempt', env.GITHUB_RUN_ATTEMPT);
-  assignIfSet(metadata, 'github_actor', env.GITHUB_ACTOR);
-  assignIfSet(metadata, 'github_event_name', env.GITHUB_EVENT_NAME);
+  assignIfSet(metadata, 'github_repository', process.env.GITHUB_REPOSITORY);
+  assignIfSet(metadata, 'github_workflow', process.env.GITHUB_WORKFLOW);
+  assignIfSet(metadata, 'github_run_id', process.env.GITHUB_RUN_ID);
+  assignIfSet(metadata, 'github_run_attempt', process.env.GITHUB_RUN_ATTEMPT);
+  assignIfSet(metadata, 'github_actor', process.env.GITHUB_ACTOR);
+  assignIfSet(metadata, 'github_event_name', process.env.GITHUB_EVENT_NAME);
+  assignIfSet(metadata, 'github_workflow_run_url', getGitHubWorkflowRunUrl());
 
-  const pullRequestNumber = getPullRequestNumber(env, readFileSync);
+  const pullRequestNumber = getPullRequestNumber();
   if (pullRequestNumber !== undefined) {
     metadata.github_pull_request_number = pullRequestNumber;
   }
@@ -84,7 +79,7 @@ export function buildMintRequestBody(inputs: MintInputs): JsonObject {
 
   const metadata = parseOptionalJsonObject(inputs.metadata ?? '', 'metadata');
   const mergedMetadata = {
-    ...getGitHubRuntimeMetadata(process.env),
+    ...getGitHubRuntimeMetadata(),
     ...(metadata ?? {}),
   };
 
@@ -147,14 +142,14 @@ export async function revokeLiteLLMToken(inputs: RevokeInputs): Promise<void> {
   }
 }
 
-function getPullRequestNumber(env: RuntimeEnv, readFileSync: ReadUtf8File): number | undefined {
-  const eventPath = env.GITHUB_EVENT_PATH;
+function getPullRequestNumber(): number | undefined {
+  const eventPath = process.env.GITHUB_EVENT_PATH;
   if (!eventPath) {
     return undefined;
   }
 
   try {
-    const parsedEvent = JSON.parse(readFileSync(eventPath)) as {
+    const parsedEvent = JSON.parse(fs.readFileSync(eventPath, 'utf8')) as {
       number?: unknown;
       pull_request?: { number?: unknown };
     };
@@ -166,22 +161,30 @@ function getPullRequestNumber(env: RuntimeEnv, readFileSync: ReadUtf8File): numb
   }
 }
 
+function getGitHubWorkflowRunUrl(): string | undefined {
+  const serverUrl = process.env.GITHUB_SERVER_URL;
+  const repository = process.env.GITHUB_REPOSITORY;
+  const runId = process.env.GITHUB_RUN_ID;
+
+  if (!serverUrl || !repository || !runId) {
+    return undefined;
+  }
+
+  return `${serverUrl.replace(/\/+$/, '')}/${repository}/actions/runs/${runId}`;
+}
+
 function assignIfSet(target: JsonObject, key: string, value: string | undefined) {
   if (value && value.trim().length > 0) {
     target[key] = value;
   }
 }
 
-function buildHeaders(masterKey: string) {
-  return {
-    Authorization: `Bearer ${masterKey}`,
-    'Content-Type': 'application/json',
-  };
-}
-
 function buildRequestConfig(masterKey: string) {
   return {
-    headers: buildHeaders(masterKey),
+    headers: {
+      Authorization: `Bearer ${masterKey}`,
+      'Content-Type': 'application/json',
+    },
     timeout: REQUEST_TIMEOUT_MS,
   };
 }

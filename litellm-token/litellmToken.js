@@ -29,7 +29,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.revokeLiteLLMToken = exports.mintLiteLLMToken = exports.buildMintRequestBody = exports.getGitHubRuntimeMetadata = exports.parseOptionalJsonObject = exports.parseListInput = void 0;
 const axios_1 = __importDefault(require("axios"));
 const fs = __importStar(require("fs"));
-const defaultReadUtf8File = (path) => fs.readFileSync(path, 'utf8');
 const REQUEST_TIMEOUT_MS = 30000;
 function parseListInput(value) {
     return value
@@ -55,15 +54,16 @@ function parseOptionalJsonObject(value, inputName) {
     return parsed;
 }
 exports.parseOptionalJsonObject = parseOptionalJsonObject;
-function getGitHubRuntimeMetadata(env, readFileSync = defaultReadUtf8File) {
+function getGitHubRuntimeMetadata() {
     const metadata = {};
-    assignIfSet(metadata, 'github_repository', env.GITHUB_REPOSITORY);
-    assignIfSet(metadata, 'github_workflow', env.GITHUB_WORKFLOW);
-    assignIfSet(metadata, 'github_run_id', env.GITHUB_RUN_ID);
-    assignIfSet(metadata, 'github_run_attempt', env.GITHUB_RUN_ATTEMPT);
-    assignIfSet(metadata, 'github_actor', env.GITHUB_ACTOR);
-    assignIfSet(metadata, 'github_event_name', env.GITHUB_EVENT_NAME);
-    const pullRequestNumber = getPullRequestNumber(env, readFileSync);
+    assignIfSet(metadata, 'github_repository', process.env.GITHUB_REPOSITORY);
+    assignIfSet(metadata, 'github_workflow', process.env.GITHUB_WORKFLOW);
+    assignIfSet(metadata, 'github_run_id', process.env.GITHUB_RUN_ID);
+    assignIfSet(metadata, 'github_run_attempt', process.env.GITHUB_RUN_ATTEMPT);
+    assignIfSet(metadata, 'github_actor', process.env.GITHUB_ACTOR);
+    assignIfSet(metadata, 'github_event_name', process.env.GITHUB_EVENT_NAME);
+    assignIfSet(metadata, 'github_workflow_run_url', getGitHubWorkflowRunUrl());
+    const pullRequestNumber = getPullRequestNumber();
     if (pullRequestNumber !== undefined) {
         metadata.github_pull_request_number = pullRequestNumber;
     }
@@ -84,7 +84,7 @@ function buildMintRequestBody(inputs) {
     };
     const metadata = parseOptionalJsonObject((_a = inputs.metadata) !== null && _a !== void 0 ? _a : '', 'metadata');
     const mergedMetadata = {
-        ...getGitHubRuntimeMetadata(process.env),
+        ...getGitHubRuntimeMetadata(),
         ...(metadata !== null && metadata !== void 0 ? metadata : {}),
     };
     if (Object.keys(mergedMetadata).length > 0) {
@@ -128,14 +128,14 @@ async function revokeLiteLLMToken(inputs) {
     }
 }
 exports.revokeLiteLLMToken = revokeLiteLLMToken;
-function getPullRequestNumber(env, readFileSync) {
+function getPullRequestNumber() {
     var _a, _b;
-    const eventPath = env.GITHUB_EVENT_PATH;
+    const eventPath = process.env.GITHUB_EVENT_PATH;
     if (!eventPath) {
         return undefined;
     }
     try {
-        const parsedEvent = JSON.parse(readFileSync(eventPath));
+        const parsedEvent = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
         const eventNumber = (_b = (_a = parsedEvent.pull_request) === null || _a === void 0 ? void 0 : _a.number) !== null && _b !== void 0 ? _b : parsedEvent.number;
         return typeof eventNumber === 'number' ? eventNumber : undefined;
     }
@@ -143,20 +143,26 @@ function getPullRequestNumber(env, readFileSync) {
         return undefined;
     }
 }
+function getGitHubWorkflowRunUrl() {
+    const serverUrl = process.env.GITHUB_SERVER_URL;
+    const repository = process.env.GITHUB_REPOSITORY;
+    const runId = process.env.GITHUB_RUN_ID;
+    if (!serverUrl || !repository || !runId) {
+        return undefined;
+    }
+    return `${serverUrl.replace(/\/+$/, '')}/${repository}/actions/runs/${runId}`;
+}
 function assignIfSet(target, key, value) {
     if (value && value.trim().length > 0) {
         target[key] = value;
     }
 }
-function buildHeaders(masterKey) {
-    return {
-        Authorization: `Bearer ${masterKey}`,
-        'Content-Type': 'application/json',
-    };
-}
 function buildRequestConfig(masterKey) {
     return {
-        headers: buildHeaders(masterKey),
+        headers: {
+            Authorization: `Bearer ${masterKey}`,
+            'Content-Type': 'application/json',
+        },
         timeout: REQUEST_TIMEOUT_MS,
     };
 }
