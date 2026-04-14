@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/elastic/kibana-github-actions#readme",
   "overrides": {
+    "flatted": "^3.4.2",
     "axios": "^1.13.4",
     "cookie": "^0.7.2",
     "cross-spawn": "^7.0.5",
