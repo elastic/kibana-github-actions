@@ -90,6 +90,29 @@ class GithubWrapper {
         core.info(`[GH-API] Comment created successfully on issue #${issueNumber}`);
         return response.data;
     }
+    async getApprovers(pullNumber) {
+        var _a;
+        core.info(`[GH-API] Fetching reviews for PR #${pullNumber}`);
+        const response = await this.github.pulls.listReviews({
+            owner: this.owner,
+            repo: this.repo,
+            pull_number: pullNumber,
+        });
+        // Walk reviews chronologically and keep the latest state per reviewer,
+        // so a dismissed/changed approval doesn't count.
+        const latestStateByUser = new Map();
+        for (const review of response.data) {
+            const login = (_a = review.user) === null || _a === void 0 ? void 0 : _a.login;
+            if (!login || !review.state)
+                continue;
+            latestStateByUser.set(login, review.state);
+        }
+        const approvers = Array.from(latestStateByUser.entries())
+            .filter(([, state]) => state === 'APPROVED')
+            .map(([login]) => login);
+        core.info(`[GH-API] Found ${approvers.length} approver(s) for PR #${pullNumber}: ${approvers.join(', ')}`);
+        return approvers;
+    }
     async updatePullRequest(number, updateFields) {
         core.info(`[GH-API] Updating PR #${number}, body length: ${updateFields.body.length} chars`);
         const response = await this.github.pulls.update({

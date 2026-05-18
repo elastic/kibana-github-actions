@@ -145,8 +145,11 @@ async function runOnMergeAction() {
     core.info(
       `[BACKPORT-RUN] Initiating backport for PR #${pullRequest.number} to ${targets.length} target(s)`,
     );
+    const assignees = await resolveBackportAssignees(githubWrapper, pullRequest);
     core.info(
-      `[BACKPORT-RUN] Backport config: assignees=[${pullRequest.user.login}], autoMerge=true, autoMergeMethod=squash`,
+      `[BACKPORT-RUN] Backport config: assignees=[${assignees.join(
+        ', ',
+      )}], autoMerge=true, autoMergeMethod=squash`,
     );
     const logFilePath = path.join(os.tmpdir(), `backport-${pullRequest.number}.log`);
     core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
@@ -160,7 +163,7 @@ async function runOnMergeAction() {
           interactive: false,
           logFilePath,
           pullNumber: pullRequest.number,
-          assignees: [pullRequest.user.login],
+          assignees,
           autoMerge: true,
           autoMergeMethod: 'squash',
           targetBranches: targets,
@@ -229,6 +232,41 @@ async function runOnMergeAction() {
       `[EXIT] PR base is not main (${pullRequest.base.ref}) and no backport label present. Nothing to do.`,
     );
   }
+}
+
+async function resolveBackportAssignees(
+  githubWrapper: GithubWrapper,
+  pullRequest: PullRequestEvent['pull_request'],
+): Promise<string[]> {
+  const author = pullRequest.user.login;
+  if (!isBotUser(author)) {
+    return [author];
+  }
+
+  core.info(`[ASSIGNEES] PR author "${author}" is a bot, looking for fallback assignees`);
+
+  const prAssignees = (pullRequest.assignees ?? []).map((u) => u.login).filter((login) => !isBotUser(login));
+  if (prAssignees.length) {
+    core.info(`[ASSIGNEES] Using PR assignees as fallback: ${prAssignees.join(', ')}`);
+    return prAssignees;
+  }
+
+  const approvers = (await githubWrapper.getApprovers(pullRequest.number)).filter(
+    (login) => !isBotUser(login),
+  );
+  if (approvers.length) {
+    core.info(`[ASSIGNEES] Using PR approvers as fallback: ${approvers.join(', ')}`);
+    return approvers;
+  }
+
+  core.warning(
+    `[ASSIGNEES] No fallback assignees found for bot-authored PR #${pullRequest.number}, falling back to author`,
+  );
+  return [author];
+}
+
+function isBotUser(login: string): boolean {
+  return login === 'Copilot' || login.includes('[bot]');
 }
 
 function isPRBackportToCurrentRelease(pullRequest: { labels: { name: string }[] }, currentLabel: string) {
