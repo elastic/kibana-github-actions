@@ -25,7 +25,12 @@
   },
   "loe:needs-research": null,
   "Team:DataDiscovery": {
-    "Team": "Discover"
+    "Team": "Discover",
+    "Workstream": "Home::Discover"
+  },
+  "Team:ESQL": {
+    "Team": "Discover",
+    "Workstream": "Home::Discover"
   },
   "Team:Visualizations": {
     "Team": "Dashboards"
