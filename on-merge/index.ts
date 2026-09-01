@@ -1,4 +1,5 @@
 import * as core from '@actions/core';
+import { exec } from '@actions/exec';
 import { context } from '@actions/github';
 import { PullRequestEvent } from '@octokit/webhooks-definitions/schema';
 import { backportRun } from 'backport';
@@ -153,6 +154,25 @@ async function runOnMergeAction() {
     );
     const logFilePath = path.join(os.tmpdir(), `backport-${pullRequest.number}.log`);
     core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
+
+    // Pre-clone partially so backport skips its full clone; rename origin since
+    // backport deletes it and lazy fetches need the promisor config to survive.
+    const backportDir = path.join(os.homedir(), '.backport', 'repositories', repo.owner, repo.repo);
+    core.info(
+      `[PARTIAL-CLONE] Treeless clone of ${repo.owner}/${repo.repo} (branch ${pullRequest.base.ref}) into ${backportDir}`,
+    );
+    await exec('git', [
+      'clone',
+      '--filter=tree:0',
+      '--single-branch',
+      '--branch',
+      pullRequest.base.ref,
+      '--progress',
+      `https://x-access-token:${accessToken}@github.com/${repo.owner}/${repo.repo}.git`,
+      backportDir,
+    ]);
+    await exec('git', ['remote', 'rename', 'origin', 'promisor-origin'], { cwd: backportDir });
+
     const stopTailing = tailFileToActions({ filePath: logFilePath, logger: core });
     try {
       const result = await backportRun({
@@ -160,6 +180,7 @@ async function runOnMergeAction() {
           repoOwner: repo.owner,
           repoName: repo.repo,
           accessToken,
+          dir: backportDir,
           interactive: false,
           logFilePath,
           pullNumber: pullRequest.number,
