@@ -35,6 +35,7 @@ const mockContext = {
       user: { login: 'test-user' },
       body: 'Default PR body',
       head: { ref: 'test-branch' },
+      merge_commit_sha: 'abc123def456',
     },
   },
 };
@@ -47,6 +48,7 @@ jest.mock('@actions/github', () => ({
 
 jest.mock('@actions/core', () => ({
   getInput: jest.fn(() => 'test-token'),
+  setSecret: jest.fn(),
   setFailed: jest.fn(),
   setOutput: jest.fn(),
   info: jest.fn((...argz) => {
@@ -65,6 +67,12 @@ jest.mock('backport', () => ({
   backportRun: mockBackportRun,
 }));
 
+// Keep tests from spawning git
+const mockExec = jest.fn(() => Promise.resolve(0));
+jest.mock('@actions/exec', () => ({
+  exec: mockExec,
+}));
+
 const defaultContext = {
   repo: { owner: 'elastic', repo: 'kibana' },
   payload: {
@@ -75,6 +83,7 @@ const defaultContext = {
       user: { login: 'test-user' },
       body: 'Default PR body',
       head: { ref: 'test-branch' },
+      merge_commit_sha: 'abc123def456',
     },
   },
   eventName: 'pull_request',
@@ -284,6 +293,7 @@ describe('On-Merge Action', () => {
           repoOwner: 'elastic',
           repoName: 'kibana',
           accessToken: 'test-token',
+          dir: expect.stringMatching(/\.backport\/repositories\/elastic\/kibana$/),
           interactive: false,
           logFilePath: expect.any(String),
           pullNumber: 12345,
@@ -296,8 +306,30 @@ describe('On-Merge Action', () => {
         },
       });
 
+      expect(mockExec.mock.calls.map((call: any[]) => call[1].join(' '))).toEqual([
+        expect.stringMatching(
+          /^clone --depth=1 --branch 9\.0 https:\/\/x-access-token:test-token@github\.com\/elastic\/kibana\.git .*\/elastic\/kibana$/,
+        ),
+        'fetch --depth=1 origin main:main 9.1:9.1',
+        'fetch --depth=2 origin abc123def456',
+      ]);
+
       // Restore environment
       process.env = originalEnv;
+    });
+
+    it('should report a failed pre-clone as a backport failure', async () => {
+      mockContext.payload.pull_request.labels = [{ name: 'backport:version' }, { name: 'v9.1.4' }];
+      mockExec.mockRejectedValueOnce(new Error('git failed'));
+
+      const { main: runOnMergeAction } = require('./index');
+
+      await runOnMergeAction();
+
+      expect(mockBackportRun).not.toHaveBeenCalled();
+      expect(mockOctokit.rest.issues.createComment).toHaveBeenCalledWith(
+        expect.objectContaining({ body: expect.stringContaining('Backport failed') }),
+      );
     });
 
     it('should handle backportRun failure gracefully', async () => {

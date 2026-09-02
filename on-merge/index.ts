@@ -1,4 +1,5 @@
 import * as core from '@actions/core';
+import { exec } from '@actions/exec';
 import { context } from '@actions/github';
 import { PullRequestEvent } from '@octokit/webhooks-definitions/schema';
 import { backportRun } from 'backport';
@@ -50,6 +51,7 @@ async function runOnMergeAction() {
   }
 
   const accessToken = core.getInput('github_token', { required: true });
+  core.setSecret(accessToken);
   const githubWrapper = new GithubWrapper({ accessToken, owner: repo.owner, repo: repo.repo });
   core.info(`[INIT] GitHub wrapper initialized for ${repo.owner}/${repo.repo}`);
 
@@ -155,11 +157,38 @@ async function runOnMergeAction() {
     core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
     const stopTailing = tailFileToActions({ filePath: logFilePath, logger: core });
     try {
+      // Shallow pre-clone; a full clone of the kibana repo is large and can time out. Every ref backport
+      // fetches must already exist here or git pulls its full history; depth 2 gives cherry-pick a parent.
+      const backportDir = path.join(os.homedir(), '.backport', 'repositories', repo.owner, repo.repo);
+      const [firstTarget, ...otherTargets] = targets;
+      const git = (args: string[], cwd?: string) =>
+        exec('git', args, {
+          cwd,
+          silent: true,
+          listeners: { stderr: (d) => core.info(d.toString().trim()) },
+        });
+      await git([
+        'clone',
+        '--depth=1',
+        '--branch',
+        firstTarget,
+        `https://x-access-token:${accessToken}@github.com/${repo.owner}/${repo.repo}.git`,
+        backportDir,
+      ]);
+      await git(
+        ['fetch', '--depth=1', 'origin', ...[pullRequest.base.ref, ...otherTargets].map((b) => `${b}:${b}`)],
+        backportDir,
+      );
+      if (pullRequest.merge_commit_sha) {
+        await git(['fetch', '--depth=2', 'origin', pullRequest.merge_commit_sha], backportDir);
+      }
+
       const result = await backportRun({
         options: {
           repoOwner: repo.owner,
           repoName: repo.repo,
           accessToken,
+          dir: backportDir,
           interactive: false,
           logFilePath,
           pullNumber: pullRequest.number,
