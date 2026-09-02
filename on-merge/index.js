@@ -25,6 +25,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.main = exports.DEFAULT_DEBOUNCE_TIMEOUT = void 0;
 const core = __importStar(require("@actions/core"));
+const exec_1 = require("@actions/exec");
 const github_1 = require("@actions/github");
 const backport_1 = require("backport");
 const os = __importStar(require("os"));
@@ -62,6 +63,7 @@ async function runOnMergeAction() {
         throw Error('Only pull_request events are supported.');
     }
     const accessToken = core.getInput('github_token', { required: true });
+    core.setSecret(accessToken);
     const githubWrapper = new github_2.GithubWrapper({ accessToken, owner: repo.owner, repo: repo.repo });
     core.info(`[INIT] GitHub wrapper initialized for ${repo.owner}/${repo.repo}`);
     core.info('[CONFIG] Fetching .backportrc.json...');
@@ -135,11 +137,35 @@ async function runOnMergeAction() {
         core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
         const stopTailing = (0, util_1.tailFileToActions)({ filePath: logFilePath, logger: core });
         try {
+            // Shallow pre-clone: backport's own full clone (~16GB) times out. Every ref backport fetches
+            // must already exist here or git pulls its full history; depth 2 gives cherry-pick a parent.
+            const backportDir = path.join(os.homedir(), '.backport', 'repositories', repo.owner, repo.repo);
+            const [firstTarget, ...otherTargets] = targets;
+            const git = (args) => (0, exec_1.exec)('git', args, { cwd: backportDir });
+            await (0, exec_1.exec)('git', [
+                'clone',
+                '--depth=1',
+                '--branch',
+                firstTarget,
+                '--progress',
+                `https://x-access-token:${accessToken}@github.com/${repo.owner}/${repo.repo}.git`,
+                backportDir,
+            ]);
+            await git([
+                'fetch',
+                '--depth=1',
+                'origin',
+                ...[pullRequest.base.ref, ...otherTargets].map((b) => `${b}:${b}`),
+            ]);
+            if (pullRequest.merge_commit_sha) {
+                await git(['fetch', '--depth=2', 'origin', pullRequest.merge_commit_sha]);
+            }
             const result = await (0, backport_1.backportRun)({
                 options: {
                     repoOwner: repo.owner,
                     repoName: repo.repo,
                     accessToken,
+                    dir: backportDir,
                     interactive: false,
                     logFilePath,
                     pullNumber: pullRequest.number,

@@ -51,6 +51,7 @@ async function runOnMergeAction() {
   }
 
   const accessToken = core.getInput('github_token', { required: true });
+  core.setSecret(accessToken);
   const githubWrapper = new GithubWrapper({ accessToken, owner: repo.owner, repo: repo.repo });
   core.info(`[INIT] GitHub wrapper initialized for ${repo.owner}/${repo.repo}`);
 
@@ -154,27 +155,32 @@ async function runOnMergeAction() {
     );
     const logFilePath = path.join(os.tmpdir(), `backport-${pullRequest.number}.log`);
     core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
-
-    // Pre-clone partially so backport skips its full clone; rename origin since
-    // backport deletes it and lazy fetches need the promisor config to survive.
-    const backportDir = path.join(os.homedir(), '.backport', 'repositories', repo.owner, repo.repo);
-    core.info(
-      `[PARTIAL-CLONE] Treeless clone of ${repo.owner}/${repo.repo} (branch ${pullRequest.base.ref}) into ${backportDir}`,
-    );
-    await exec('git', [
-      'clone',
-      '--filter=tree:0',
-      '--single-branch',
-      '--branch',
-      pullRequest.base.ref,
-      '--progress',
-      `https://x-access-token:${accessToken}@github.com/${repo.owner}/${repo.repo}.git`,
-      backportDir,
-    ]);
-    await exec('git', ['remote', 'rename', 'origin', 'promisor-origin'], { cwd: backportDir });
-
     const stopTailing = tailFileToActions({ filePath: logFilePath, logger: core });
     try {
+      // Shallow pre-clone: backport's own full clone (~16GB) times out. Every ref backport fetches
+      // must already exist here or git pulls its full history; depth 2 gives cherry-pick a parent.
+      const backportDir = path.join(os.homedir(), '.backport', 'repositories', repo.owner, repo.repo);
+      const [firstTarget, ...otherTargets] = targets;
+      const git = (args: string[]) => exec('git', args, { cwd: backportDir });
+      await exec('git', [
+        'clone',
+        '--depth=1',
+        '--branch',
+        firstTarget,
+        '--progress',
+        `https://x-access-token:${accessToken}@github.com/${repo.owner}/${repo.repo}.git`,
+        backportDir,
+      ]);
+      await git([
+        'fetch',
+        '--depth=1',
+        'origin',
+        ...[pullRequest.base.ref, ...otherTargets].map((b) => `${b}:${b}`),
+      ]);
+      if (pullRequest.merge_commit_sha) {
+        await git(['fetch', '--depth=2', 'origin', pullRequest.merge_commit_sha]);
+      }
+
       const result = await backportRun({
         options: {
           repoOwner: repo.owner,
