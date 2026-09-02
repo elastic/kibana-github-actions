@@ -157,28 +157,30 @@ async function runOnMergeAction() {
     core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
     const stopTailing = tailFileToActions({ filePath: logFilePath, logger: core });
     try {
-      // Shallow pre-clone: backport's own full clone (~16GB) times out. Every ref backport fetches
-      // must already exist here or git pulls its full history; depth 2 gives cherry-pick a parent.
+      // Shallow pre-clone; backport's own full clone times out. Every ref backport fetches must
+      // already exist here or git pulls its full history; depth 2 gives cherry-pick a parent.
       const backportDir = path.join(os.homedir(), '.backport', 'repositories', repo.owner, repo.repo);
       const [firstTarget, ...otherTargets] = targets;
-      const git = (args: string[]) => exec('git', args, { cwd: backportDir });
-      await exec('git', [
+      const git = (args: string[], cwd?: string) =>
+        exec('git', args, {
+          cwd,
+          silent: true,
+          listeners: { stderr: (d) => core.info(d.toString().trim()) },
+        });
+      await git([
         'clone',
         '--depth=1',
         '--branch',
         firstTarget,
-        '--progress',
         `https://x-access-token:${accessToken}@github.com/${repo.owner}/${repo.repo}.git`,
         backportDir,
       ]);
-      await git([
-        'fetch',
-        '--depth=1',
-        'origin',
-        ...[pullRequest.base.ref, ...otherTargets].map((b) => `${b}:${b}`),
-      ]);
+      await git(
+        ['fetch', '--depth=1', 'origin', ...[pullRequest.base.ref, ...otherTargets].map((b) => `${b}:${b}`)],
+        backportDir,
+      );
       if (pullRequest.merge_commit_sha) {
-        await git(['fetch', '--depth=2', 'origin', pullRequest.merge_commit_sha]);
+        await git(['fetch', '--depth=2', 'origin', pullRequest.merge_commit_sha], backportDir);
       }
 
       const result = await backportRun({

@@ -306,10 +306,9 @@ describe('On-Merge Action', () => {
         },
       });
 
-      // Verify: shallow pre-clone with every ref backport will fetch
       expect(mockExec.mock.calls.map((call: any[]) => call[1].join(' '))).toEqual([
         expect.stringMatching(
-          /^clone --depth=1 --branch 9\.0 --progress https:\/\/x-access-token:test-token@github\.com\/elastic\/kibana\.git .*\/elastic\/kibana$/,
+          /^clone --depth=1 --branch 9\.0 https:\/\/x-access-token:test-token@github\.com\/elastic\/kibana\.git .*\/elastic\/kibana$/,
         ),
         'fetch --depth=1 origin main:main 9.1:9.1',
         'fetch --depth=2 origin abc123def456',
