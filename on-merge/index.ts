@@ -157,8 +157,8 @@ async function runOnMergeAction() {
     core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
     const stopTailing = tailFileToActions({ filePath: logFilePath, logger: core });
     try {
-      // Shallow pre-clone; backport's own full clone times out. Every ref backport fetches must
-      // already exist here or git pulls its full history; depth 2 gives cherry-pick a parent.
+      // Shallow pre-clone; a full clone of the kibana repo is large and can time out. Every ref backport
+      // fetches must already exist here or git pulls its full history; depth 2 gives cherry-pick a parent.
       const backportDir = path.join(os.homedir(), '.backport', 'repositories', repo.owner, repo.repo);
       const [firstTarget, ...otherTargets] = targets;
       const git = (args: string[], cwd?: string) =>
