@@ -64,13 +64,17 @@ export function getMissingReleaseVersionLabels(versions: VersionsParsed, labels:
   return missing.sort(compareVersionLabels);
 }
 
-export function getVersionGapComment(labelsToAdd: string[]): string {
-  return [
+export function getVersionGapComment(labelsToAdd: string[], author?: string): string {
+  const lines = [
     'These release branches sit between the oldest version label on this PR and main, and were not part of this backport:',
     ...labelsToAdd.map((label) => `- ${label}`),
     '',
     'Add the version label if one of them should be backported too.',
-  ].join('\n');
+  ];
+  if (author && !author.includes('[bot]')) {
+    lines.unshift(`@${author}`, '');
+  }
+  return lines.join('\n');
 }
 
 function compareVersionLabels(left: string, right: string): number {

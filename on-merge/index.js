@@ -110,7 +110,7 @@ async function runOnMergeAction() {
             const missingLabels = (0, versionGaps_1.getMissingReleaseVersionLabels)(versions, pullRequest.labels.map((label) => label.name));
             if (missingLabels.length) {
                 core.info(`[LABELS] Version gaps not backported: ${missingLabels.join(', ')}`);
-                await githubWrapper.createComment(pullRequest.number, (0, versionGaps_1.getVersionGapComment)(missingLabels));
+                await githubWrapper.createComment(pullRequest.number, (0, versionGaps_1.getVersionGapComment)(missingLabels, pullRequest.user.login));
             }
         }
         // Find backport targets

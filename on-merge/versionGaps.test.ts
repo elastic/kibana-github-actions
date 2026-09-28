@@ -42,9 +42,15 @@ describe('getMissingReleaseVersionLabels', () => {
 });
 
 describe('getVersionGapComment', () => {
-  it('names the branches that were not backported', () => {
-    const comment = getVersionGapComment(['v9.5.5']);
+  it('names the branches that were not backported and mentions the author', () => {
+    const comment = getVersionGapComment(['v9.5.5'], 'shahzad31');
+    expect(comment).to.contain('@shahzad31');
     expect(comment).to.contain('- v9.5.5');
     expect(comment).to.contain('were not part of this backport');
+  });
+
+  it('does not mention a bot author', () => {
+    const comment = getVersionGapComment(['v9.5.5'], 'kibanamachine[bot]');
+    expect(comment).to.not.contain('@');
   });
 });

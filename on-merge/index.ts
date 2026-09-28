@@ -115,7 +115,10 @@ async function runOnMergeAction() {
       );
       if (missingLabels.length) {
         core.info(`[LABELS] Version gaps not backported: ${missingLabels.join(', ')}`);
-        await githubWrapper.createComment(pullRequest.number, getVersionGapComment(missingLabels));
+        await githubWrapper.createComment(
+          pullRequest.number,
+          getVersionGapComment(missingLabels, pullRequest.user.login),
+        );
       }
     }
 

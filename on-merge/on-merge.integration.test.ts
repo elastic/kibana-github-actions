@@ -316,7 +316,7 @@ describe('On-Merge Action', () => {
         owner: 'elastic',
         repo: 'kibana',
         issue_number: 12345,
-        body: expect.stringContaining('- v9.1.4'),
+        body: expect.stringMatching(/@test-user[\s\S]*- v9\.1\.4/),
       });
       expect(mockBackportRun).toHaveBeenCalledWith({
         options: expect.objectContaining({
