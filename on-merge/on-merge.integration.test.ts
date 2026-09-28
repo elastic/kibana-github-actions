@@ -20,6 +20,7 @@ const mockOctokit = {
     },
     pulls: {
       update: jest.fn(() => Promise.resolve({ data: {} })),
+      list: jest.fn(() => Promise.resolve({ data: [] })),
     },
   },
 };
@@ -118,6 +119,7 @@ describe('On-Merge Action', () => {
     });
 
     mockBackportRun.mockResolvedValue({ status: 'success' } as any);
+    mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
 
     // Reset context to default state - now this should work since mockContext is a regular object
     Object.assign(mockContext, JSON.parse(JSON.stringify(defaultContext)));
@@ -298,6 +300,57 @@ describe('On-Merge Action', () => {
 
       // Restore environment
       process.env = originalEnv;
+    });
+
+    it('backports a release branch that sits between the oldest version label and main', async () => {
+      mockContext.payload.pull_request.labels = [{ name: 'backport:version' }, { name: 'v9.0.7' }];
+
+      const { main: runOnMergeAction } = require('./index');
+
+      await runOnMergeAction();
+
+      expect(mockOctokit.rest.issues.addLabels).toHaveBeenCalledWith({
+        owner: 'elastic',
+        repo: 'kibana',
+        issue_number: 12345,
+        labels: ['v9.1.4'],
+      });
+      expect(mockOctokit.rest.issues.createComment).toHaveBeenCalledWith({
+        owner: 'elastic',
+        repo: 'kibana',
+        issue_number: 12345,
+        body: expect.stringContaining('- v9.1.4'),
+      });
+      expect(mockBackportRun).toHaveBeenCalledWith({
+        options: expect.objectContaining({
+          targetBranches: ['9.0', '9.1'],
+        }),
+      });
+    });
+
+    it('skips a target that already has a merged backport pull request', async () => {
+      mockContext.payload.pull_request.labels = [
+        { name: 'backport:version' },
+        { name: 'v9.2.0' },
+        { name: 'v9.1.4' },
+        { name: 'v9.0.7' },
+      ];
+      (mockOctokit.rest.pulls.list as jest.Mock).mockImplementation(({ head }: { head: string }) => {
+        if (head === 'elastic:backport/9.1/pr-12345') {
+          return Promise.resolve({ data: [{ state: 'closed', merged_at: '2026-01-01T00:00:00Z' }] });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
+      const { main: runOnMergeAction } = require('./index');
+
+      await runOnMergeAction();
+
+      expect(mockBackportRun).toHaveBeenCalledWith({
+        options: expect.objectContaining({
+          targetBranches: ['9.0'],
+        }),
+      });
     });
 
     it('should handle backportRun failure gracefully', async () => {
