@@ -42,9 +42,9 @@ describe('getMissingReleaseVersionLabels', () => {
 });
 
 describe('getVersionGapComment', () => {
-  it('names the labels that will be backported', () => {
+  it('names the branches that were not backported', () => {
     const comment = getVersionGapComment(['v9.5.5']);
     expect(comment).to.contain('- v9.5.5');
-    expect(comment).to.contain('included in this backport');
+    expect(comment).to.contain('were not part of this backport');
   });
 });

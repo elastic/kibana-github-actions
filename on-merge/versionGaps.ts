@@ -13,8 +13,9 @@ interface ParsedVersionLabel {
  * `backport:version` only targets minors that are labeled. After a branch cut,
  * main's version label (v9.6.0) is applied on merge and is not itself a
  * backport request, so a PR labeled v9.4.4 would skip the 9.5 release branch.
- * Fill those release branches from versions.json. Do not cross majors: a
- * v8.19 label does not pull in 9.x.
+ * Comment with those release branches from versions.json. Do not add the label,
+ * so a v9.4 backport is not forced onto 9.5. Do not cross majors: a v8.19
+ * label does not mention 9.x.
  */
 export function getMissingReleaseVersionLabels(versions: VersionsParsed, labels: string[]): string[] {
   const parsed = labels
@@ -65,11 +66,10 @@ export function getMissingReleaseVersionLabels(versions: VersionsParsed, labels:
 
 export function getVersionGapComment(labelsToAdd: string[]): string {
   return [
-    'The following labels were identified as gaps in your version labels and will be added automatically:',
+    'These release branches sit between the oldest version label on this PR and main, and were not part of this backport:',
     ...labelsToAdd.map((label) => `- ${label}`),
     '',
-    'These release branches sit between the oldest version label on this PR and main, so they are included in this backport.',
-    'If one of them should be skipped, close its backport PR and remove the label.',
+    'Add the version label if one of them should be backported too.',
   ].join('\n');
 }
 

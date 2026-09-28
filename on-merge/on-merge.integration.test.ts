@@ -302,19 +302,16 @@ describe('On-Merge Action', () => {
       process.env = originalEnv;
     });
 
-    it('backports a release branch that sits between the oldest version label and main', async () => {
+    it('comments on a release branch gap without backporting it', async () => {
       mockContext.payload.pull_request.labels = [{ name: 'backport:version' }, { name: 'v9.0.7' }];
 
       const { main: runOnMergeAction } = require('./index');
 
       await runOnMergeAction();
 
-      expect(mockOctokit.rest.issues.addLabels).toHaveBeenCalledWith({
-        owner: 'elastic',
-        repo: 'kibana',
-        issue_number: 12345,
-        labels: ['v9.1.4'],
-      });
+      expect(mockOctokit.rest.issues.addLabels).not.toHaveBeenCalledWith(
+        expect.objectContaining({ labels: ['v9.1.4'] }),
+      );
       expect(mockOctokit.rest.issues.createComment).toHaveBeenCalledWith({
         owner: 'elastic',
         repo: 'kibana',
@@ -323,7 +320,7 @@ describe('On-Merge Action', () => {
       });
       expect(mockBackportRun).toHaveBeenCalledWith({
         options: expect.objectContaining({
-          targetBranches: ['9.0', '9.1'],
+          targetBranches: ['9.0'],
         }),
       });
     });

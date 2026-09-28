@@ -114,8 +114,7 @@ async function runOnMergeAction() {
         pullRequest.labels.map((label) => label.name),
       );
       if (missingLabels.length) {
-        core.info(`[LABELS] Filling version gaps: ${missingLabels.join(', ')}`);
-        await githubWrapper.addLabels(pullRequest, missingLabels);
+        core.info(`[LABELS] Version gaps not backported: ${missingLabels.join(', ')}`);
         await githubWrapper.createComment(pullRequest.number, getVersionGapComment(missingLabels));
       }
     }

@@ -109,8 +109,7 @@ async function runOnMergeAction() {
             !(0, util_1.labelsContain)(pullRequest.labels, backportTargets_1.BACKPORT_LABELS.ALL_OPEN)) {
             const missingLabels = (0, versionGaps_1.getMissingReleaseVersionLabels)(versions, pullRequest.labels.map((label) => label.name));
             if (missingLabels.length) {
-                core.info(`[LABELS] Filling version gaps: ${missingLabels.join(', ')}`);
-                await githubWrapper.addLabels(pullRequest, missingLabels);
+                core.info(`[LABELS] Version gaps not backported: ${missingLabels.join(', ')}`);
                 await githubWrapper.createComment(pullRequest.number, (0, versionGaps_1.getVersionGapComment)(missingLabels));
             }
         }
