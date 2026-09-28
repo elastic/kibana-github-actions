@@ -1,0 +1,30 @@
+name: 'Check backport gaps'
+description: 'Comment on pull requests that made an older release branch and main, but missed the release branch between them'
+inputs:
+  github_token:
+    description: Token used to search pull requests and comment
+    required: true
+  branch:
+    description: Release branch to check, for example 9.5. Falls back to the tag.
+    required: false
+  tag:
+    description: Release tag, for example v9.5.4. Used when branch is empty.
+    required: false
+  since_days:
+    description: How many days of merged backport pull requests to scan
+    required: false
+    default: '180'
+  dry_run:
+    description: Log the comments instead of posting them
+    required: false
+    default: 'false'
+  max_comments:
+    description: Cap comments per run so a bad scan cannot flood pull requests
+    required: false
+    default: '25'
+runs:
+  using: 'node20'
+  main: 'index.js'
+branding:
+  icon: git-branch
+  color: green
