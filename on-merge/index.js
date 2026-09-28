@@ -32,6 +32,7 @@ const path = __importStar(require("path"));
 const backportTargets_1 = require("./backportTargets");
 const util_1 = require("./util");
 const versions_1 = require("./versions");
+const versionGaps_1 = require("./versionGaps");
 const github_2 = require("./github");
 exports.DEFAULT_DEBOUNCE_TIMEOUT = 15000;
 const workflowState = {
@@ -104,6 +105,14 @@ async function runOnMergeAction() {
             core.info("[EXIT] Backport skipped because 'backport:skip' label is present");
             return;
         }
+        if ((0, util_1.labelsContain)(pullRequest.labels, backportTargets_1.BACKPORT_LABELS.VERSION) &&
+            !(0, util_1.labelsContain)(pullRequest.labels, backportTargets_1.BACKPORT_LABELS.ALL_OPEN)) {
+            const missingLabels = (0, versionGaps_1.getMissingReleaseVersionLabels)(versions, pullRequest.labels.map((label) => label.name));
+            if (missingLabels.length) {
+                core.info(`[LABELS] Version gaps not backported: ${missingLabels.join(', ')}`);
+                await githubWrapper.createComment(pullRequest.number, (0, versionGaps_1.getVersionGapComment)(missingLabels));
+            }
+        }
         // Find backport targets
         const labelNames = pullRequest.labels.map((label) => label.name);
         core.info(`[TARGETS] Resolving backport targets from labels: ${labelNames.join(', ')}`);
@@ -112,7 +121,19 @@ async function runOnMergeAction() {
             core.info(`[EXIT] Backport skipped, because no backport targets found. Labels checked: ${labelNames.join(', ')}`);
             return;
         }
-        core.info(`[TARGETS] Resolved ${targets.length} backport target(s): ${targets.join(', ')}`);
+        const pendingTargets = [];
+        for (const target of targets) {
+            if (await githubWrapper.hasOpenOrMergedBackport(pullRequest.number, target)) {
+                core.info(`[TARGETS] Skipping ${target}; an open or merged backport PR already exists`);
+                continue;
+            }
+            pendingTargets.push(target);
+        }
+        if (!pendingTargets.length) {
+            core.info('[EXIT] Backport skipped, every target already has an open or merged backport PR');
+            return;
+        }
+        core.info(`[TARGETS] Resolved ${pendingTargets.length} backport target(s): ${pendingTargets.join(', ')}`);
         // Sleep for debounceTimeout to debounce multiple concurrent runs
         core.info(`[DEBOUNCE] Waiting ${(debounceTimeout / 1000).toFixed(1)}s to debounce multiple concurrent runs...`);
         await new Promise((resolve) => setTimeout(resolve, debounceTimeout));
@@ -121,14 +142,14 @@ async function runOnMergeAction() {
             return;
         }
         else {
-            core.info(`[BACKPORT] Starting backport to target branches: ${targets.join(', ')} based on labels: ${labelNames.join(', ')}`);
+            core.info(`[BACKPORT] Starting backport to target branches: ${pendingTargets.join(', ')} based on labels: ${labelNames.join(', ')}`);
         }
         // Add comment about planned backports and update PR body with backport metadata
         core.info('[PR-UPDATE] Updating PR with backport info...');
-        await updatePRWithBackportInfo(githubWrapper, pullRequest, targets);
+        await updatePRWithBackportInfo(githubWrapper, pullRequest, pendingTargets);
         core.info('[PR-UPDATE] PR updated successfully');
         // Start backport for the calculated targets
-        core.info(`[BACKPORT-RUN] Initiating backport for PR #${pullRequest.number} to ${targets.length} target(s)`);
+        core.info(`[BACKPORT-RUN] Initiating backport for PR #${pullRequest.number} to ${pendingTargets.length} target(s)`);
         const assignees = await resolveBackportAssignees(githubWrapper, pullRequest);
         core.info(`[BACKPORT-RUN] Backport config: assignees=[${assignees.join(', ')}], autoMerge=true, autoMergeMethod=squash`);
         const logFilePath = path.join(os.tmpdir(), `backport-${pullRequest.number}.log`);
@@ -146,7 +167,7 @@ async function runOnMergeAction() {
                     assignees,
                     autoMerge: true,
                     autoMergeMethod: 'squash',
-                    targetBranches: targets,
+                    targetBranches: pendingTargets,
                     publishStatusCommentOnFailure: true,
                     publishStatusCommentOnSuccess: true, // TODO this will flip to false once we have backport summaries implemented
                 },

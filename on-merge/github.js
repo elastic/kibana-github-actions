@@ -113,6 +113,20 @@ class GithubWrapper {
         core.info(`[GH-API] Found ${approvers.length} approver(s) for PR #${pullNumber}: ${approvers.join(', ')}`);
         return approvers;
     }
+    async hasOpenOrMergedBackport(pullNumber, targetBranch) {
+        const head = `${this.owner}:backport/${targetBranch}/pr-${pullNumber}`;
+        core.info(`[GH-API] Checking for an existing backport PR with head ${head}`);
+        const response = await this.github.pulls.list({
+            owner: this.owner,
+            repo: this.repo,
+            head,
+            state: 'all',
+            per_page: 10,
+        });
+        const existing = response.data.some((pullRequest) => pullRequest.state === 'open' || Boolean(pullRequest.merged_at));
+        core.info(`[GH-API] Open or merged backport for ${targetBranch}: ${existing}`);
+        return existing;
+    }
     async updatePullRequest(number, updateFields) {
         core.info(`[GH-API] Updating PR #${number}, body length: ${updateFields.body.length} chars`);
         const response = await this.github.pulls.update({
