@@ -1,13 +1,17 @@
-import { Commit } from 'backport';
 import axios from 'axios';
 import semver from 'semver';
 import * as fs from 'fs';
+
+// Subset of backport's `Commit` that is serialized into the backport PR description.
+export interface BackportPrData {
+  sourcePullRequest?: { number: number };
+}
 
 export function getPrBackportData(prBody: string | undefined | null) {
   const prDataMatch = prBody?.match(/<!--BACKPORT (.*?) BACKPORT-->/s);
   if (prDataMatch?.[1]) {
     const prDataJson = prDataMatch[1];
-    const prData: Commit[] = JSON.parse(prDataJson);
+    const prData: BackportPrData[] = JSON.parse(prDataJson);
     return prData;
   }
 

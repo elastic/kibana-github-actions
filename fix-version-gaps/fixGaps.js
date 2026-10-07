@@ -1,6 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.fixGaps = exports.getCommentFromLabels = exports.getVersionLabelsToAdd = exports.getVersionsFromBackportConfig = exports.getLowestVersionsOnPr = void 0;
+exports.getLowestVersionsOnPr = getLowestVersionsOnPr;
+exports.getVersionsFromBackportConfig = getVersionsFromBackportConfig;
+exports.getVersionLabelsToAdd = getVersionLabelsToAdd;
+exports.getCommentFromLabels = getCommentFromLabels;
+exports.fixGaps = fixGaps;
 const rest_1 = require("@octokit/rest");
 function getLowestVersionsOnPr(pr) {
     const lowestVersionsOnPr = {};
@@ -18,7 +22,6 @@ function getLowestVersionsOnPr(pr) {
     }
     return lowestVersionsOnPr;
 }
-exports.getLowestVersionsOnPr = getLowestVersionsOnPr;
 function getVersionsFromBackportConfig(config) {
     const highestVersions = [];
     for (const label in config.branchLabelMapping) {
@@ -30,7 +33,6 @@ function getVersionsFromBackportConfig(config) {
     }
     return highestVersions;
 }
-exports.getVersionsFromBackportConfig = getVersionsFromBackportConfig;
 function getVersionLabelsToAdd(config, pr) {
     const versionsFromBackportConfig = getVersionsFromBackportConfig(config);
     const lowestVersionsOnPr = getLowestVersionsOnPr(pr);
@@ -48,7 +50,6 @@ function getVersionLabelsToAdd(config, pr) {
     }
     return versionLabelsToAdd;
 }
-exports.getVersionLabelsToAdd = getVersionLabelsToAdd;
 function getCommentFromLabels(labelsToAdd) {
     return [
         'The following labels were identified as gaps in your version labels and will be added automatically:',
@@ -57,7 +58,6 @@ function getCommentFromLabels(labelsToAdd) {
         'If any of these should not be on your pull request, please manually remove them.',
     ].join('\n');
 }
-exports.getCommentFromLabels = getCommentFromLabels;
 function createComment(octokit, pr, labelsToAdd) {
     return octokit.issues.createComment({
         owner: pr.base.repo.owner.login,
@@ -84,5 +84,4 @@ async function fixGaps(accessToken, config, pr) {
         await addLabels(octokit, pr, labelsToAdd);
     }
 }
-exports.fixGaps = fixGaps;
 //# sourceMappingURL=fixGaps.js.map

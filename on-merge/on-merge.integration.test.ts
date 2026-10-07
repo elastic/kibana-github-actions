@@ -62,9 +62,14 @@ jest.mock('@actions/core', () => ({
 }));
 
 const mockBackportRun = jest.fn();
-jest.mock('backport', () => ({
-  backportRun: mockBackportRun,
-}));
+// virtual: jest's resolver cannot resolve the ESM-only package
+jest.mock(
+  'backport',
+  () => ({
+    backportRun: mockBackportRun,
+  }),
+  { virtual: true },
+);
 
 const defaultContext = {
   repo: { owner: 'elastic', repo: 'kibana' },
@@ -118,7 +123,17 @@ describe('On-Merge Action', () => {
       )[request.path];
     });
 
-    mockBackportRun.mockResolvedValue({ status: 'success' } as any);
+    mockBackportRun.mockResolvedValue({
+      commits: [],
+      results: [
+        {
+          status: 'success',
+          targetBranch: '9.0',
+          pullRequestUrl: 'https://example.com/1',
+          pullRequestNumber: 1,
+        },
+      ],
+    });
     mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
 
     // Reset context to default state - now this should work since mockContext is a regular object
@@ -282,10 +297,12 @@ describe('On-Merge Action', () => {
 
       // Verify: should call backportRun with correct options
       expect(mockBackportRun).toHaveBeenCalledWith({
+        exitCodeOnFailure: false,
         options: {
           repoOwner: 'elastic',
           repoName: 'kibana',
-          accessToken: 'test-token',
+          githubToken: 'test-token',
+          cloneFilter: 'blob:none',
           interactive: false,
           logFilePath: expect.any(String),
           pullNumber: 12345,
@@ -318,11 +335,13 @@ describe('On-Merge Action', () => {
         issue_number: 12345,
         body: expect.stringMatching(/@test-user[\s\S]*- v9\.1\.4/),
       });
-      expect(mockBackportRun).toHaveBeenCalledWith({
-        options: expect.objectContaining({
-          targetBranches: ['9.0'],
+      expect(mockBackportRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({
+            targetBranches: ['9.0'],
+          }),
         }),
-      });
+      );
     });
 
     it('skips a target that already has a merged backport pull request', async () => {
@@ -343,11 +362,13 @@ describe('On-Merge Action', () => {
 
       await runOnMergeAction();
 
-      expect(mockBackportRun).toHaveBeenCalledWith({
-        options: expect.objectContaining({
-          targetBranches: ['9.0'],
+      expect(mockBackportRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({
+            targetBranches: ['9.0'],
+          }),
         }),
-      });
+      );
     });
 
     it('should handle backportRun failure gracefully', async () => {
@@ -359,9 +380,16 @@ describe('On-Merge Action', () => {
       ];
 
       mockBackportRun.mockResolvedValueOnce({
-        status: 'failure',
-        error: new Error('Backport failed'),
-      } as any);
+        commits: [],
+        results: [
+          {
+            status: 'error',
+            targetBranch: '9.1',
+            errorMessage: 'Backport failed',
+            errorCode: 'unhandled-exception',
+          },
+        ],
+      });
 
       const { main: runOnMergeAction } = require('./index');
 

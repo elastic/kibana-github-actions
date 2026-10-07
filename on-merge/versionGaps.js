@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getVersionGapComment = exports.getMissingReleaseVersionLabels = void 0;
+exports.getMissingReleaseVersionLabels = getMissingReleaseVersionLabels;
+exports.getVersionGapComment = getVersionGapComment;
 const VERSION_LABEL = /^v(\d+)\.(\d+)\.\d+$/;
 /**
  * Release branches that sit between an explicit backport label and main.
@@ -54,7 +55,6 @@ function getMissingReleaseVersionLabels(versions, labels) {
     }
     return missing.sort(compareVersionLabels);
 }
-exports.getMissingReleaseVersionLabels = getMissingReleaseVersionLabels;
 function getVersionGapComment(labelsToAdd, author) {
     const lines = [
         'These release branches sit between the oldest version label on this PR and main, and were not part of this backport:',
@@ -67,7 +67,6 @@ function getVersionGapComment(labelsToAdd, author) {
     }
     return lines.join('\n');
 }
-exports.getVersionGapComment = getVersionGapComment;
 function compareVersionLabels(left, right) {
     const leftParts = left.slice(1).split('.').map(Number);
     const rightParts = right.slice(1).split('.').map(Number);
