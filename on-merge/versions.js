@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.parseVersions = void 0;
+exports.parseVersions = parseVersions;
 function parseVersions(versionsFile) {
     const currentVersion = versionsFile.versions.find((v) => v.branch === 'main');
     if (!currentVersion) {
@@ -12,5 +12,4 @@ function parseVersions(versionsFile) {
     };
     return parsed;
 }
-exports.parseVersions = parseVersions;
 //# sourceMappingURL=versions.js.map

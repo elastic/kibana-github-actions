@@ -1,7 +1,6 @@
 import * as core from '@actions/core';
 import { context } from '@actions/github';
 import { PullRequestEvent } from '@octokit/webhooks-definitions/schema';
-import { backportRun } from 'backport';
 import * as os from 'os';
 import * as path from 'path';
 import { BACKPORT_LABELS, resolveTargets } from './backportTargets';
@@ -187,11 +186,15 @@ async function runOnMergeAction() {
     core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
     const stopTailing = tailFileToActions({ filePath: logFilePath, logger: core });
     try {
-      const result = await backportRun({
+      // backport is ESM-only, so it has to be loaded with a native dynamic import
+      const { backportRun } = await import('backport');
+      const { results } = await backportRun({
+        exitCodeOnFailure: false,
         options: {
           repoOwner: repo.owner,
           repoName: repo.repo,
-          accessToken,
+          githubToken: accessToken,
+          cloneFilter: 'blob:none',
           interactive: false,
           logFilePath,
           pullNumber: pullRequest.number,
@@ -204,16 +207,20 @@ async function runOnMergeAction() {
         },
       });
       stopTailing();
-      core.info(`[BACKPORT-RUN] Backport completed with status: ${result.status}`);
-      if (result.status === 'failure') {
-        core.error(`[BACKPORT-RUN] Backport failed with error type: ${typeof result.error}`);
-        if (typeof result.error === 'string') {
-          throw new Error(result.error);
-        } else if (result.error instanceof Error) {
-          throw result.error;
-        } else {
-          throw new Error('Backport failed for an unknown reason');
-        }
+      const failures = results.filter((result) => result.status === 'error');
+      core.info(
+        `[BACKPORT-RUN] Backport completed: ${results.length - failures.length} succeeded, ${
+          failures.length
+        } failed`,
+      );
+      if (failures.length > 0 || results.length === 0) {
+        throw new Error(
+          failures.length > 0
+            ? failures
+                .map((failure) => `${failure.targetBranch ?? 'unknown branch'}: ${failure.errorMessage}`)
+                .join('; ')
+            : 'Backport finished without any result',
+        );
       }
       core.info('[SUCCESS] Backport process completed successfully');
     } catch (err) {

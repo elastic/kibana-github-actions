@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mapLabelsToAttributes = void 0;
+exports.mapLabelsToAttributes = mapLabelsToAttributes;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const rest_1 = require("@octokit/rest");
@@ -86,7 +86,6 @@ async function mapLabelsToAttributes(args) {
     }
     return updateResults;
 }
-exports.mapLabelsToAttributes = mapLabelsToAttributes;
 function loadMapping(mappingFileName) {
     const pathToMapping = path_1.default.join(__dirname, mappingFileName);
     const mapping = fs_1.default.readFileSync(pathToMapping, 'utf8');

@@ -15,18 +15,28 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.main = exports.DEFAULT_DEBOUNCE_TIMEOUT = void 0;
+exports.DEFAULT_DEBOUNCE_TIMEOUT = void 0;
+exports.main = main;
 const core = __importStar(require("@actions/core"));
 const github_1 = require("@actions/github");
-const backport_1 = require("backport");
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const backportTargets_1 = require("./backportTargets");
@@ -52,7 +62,6 @@ async function main() {
         process.off('SIGTERM', workflowState.terminate);
     });
 }
-exports.main = main;
 async function runOnMergeAction() {
     var _a;
     const { payload, repo } = github_1.context;
@@ -156,11 +165,15 @@ async function runOnMergeAction() {
         core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
         const stopTailing = (0, util_1.tailFileToActions)({ filePath: logFilePath, logger: core });
         try {
-            const result = await (0, backport_1.backportRun)({
+            // backport is ESM-only, so it has to be loaded with a native dynamic import
+            const { backportRun } = await import('backport');
+            const { results } = await backportRun({
+                exitCodeOnFailure: false,
                 options: {
                     repoOwner: repo.owner,
                     repoName: repo.repo,
-                    accessToken,
+                    githubToken: accessToken,
+                    cloneFilter: 'blob:none',
                     interactive: false,
                     logFilePath,
                     pullNumber: pullRequest.number,
@@ -173,18 +186,14 @@ async function runOnMergeAction() {
                 },
             });
             stopTailing();
-            core.info(`[BACKPORT-RUN] Backport completed with status: ${result.status}`);
-            if (result.status === 'failure') {
-                core.error(`[BACKPORT-RUN] Backport failed with error type: ${typeof result.error}`);
-                if (typeof result.error === 'string') {
-                    throw new Error(result.error);
-                }
-                else if (result.error instanceof Error) {
-                    throw result.error;
-                }
-                else {
-                    throw new Error('Backport failed for an unknown reason');
-                }
+            const failures = results.filter((result) => result.status === 'error');
+            core.info(`[BACKPORT-RUN] Backport completed: ${results.length - failures.length} succeeded, ${failures.length} failed`);
+            if (failures.length > 0 || results.length === 0) {
+                throw new Error(failures.length > 0
+                    ? failures
+                        .map((failure) => { var _a; return `${(_a = failure.targetBranch) !== null && _a !== void 0 ? _a : 'unknown branch'}: ${failure.errorMessage}`; })
+                        .join('; ')
+                    : 'Backport finished without any result');
             }
             core.info('[SUCCESS] Backport process completed successfully');
         }

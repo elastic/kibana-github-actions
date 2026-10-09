@@ -1,6 +1,5 @@
 import { Octokit } from '@octokit/rest';
 import { PullRequest } from '@octokit/webhooks-definitions/schema';
-import { ConfigFileOptions } from 'backport';
 
 export function getLowestVersionsOnPr(pr: PullRequest) {
   const lowestVersionsOnPr: Record<string, string> = {};
@@ -20,7 +19,12 @@ export function getLowestVersionsOnPr(pr: PullRequest) {
   return lowestVersionsOnPr;
 }
 
-export function getVersionsFromBackportConfig(config: ConfigFileOptions) {
+// Subset of backport's `BackportConfig` that this action reads.
+export interface BackportConfig {
+  branchLabelMapping?: Record<string, string>;
+}
+
+export function getVersionsFromBackportConfig(config: BackportConfig) {
   const highestVersions = [];
 
   for (const label in config.branchLabelMapping) {
@@ -34,7 +38,7 @@ export function getVersionsFromBackportConfig(config: ConfigFileOptions) {
   return highestVersions;
 }
 
-export function getVersionLabelsToAdd(config: ConfigFileOptions, pr: PullRequest) {
+export function getVersionLabelsToAdd(config: BackportConfig, pr: PullRequest) {
   const versionsFromBackportConfig = getVersionsFromBackportConfig(config);
   const lowestVersionsOnPr = getLowestVersionsOnPr(pr);
   const allLabels = pr.labels.map((label) => label.name);
@@ -82,7 +86,7 @@ function addLabels(octokit: Octokit, pr: PullRequest, labelsToAdd: string[]) {
   });
 }
 
-export async function fixGaps(accessToken: string, config: ConfigFileOptions, pr: PullRequest) {
+export async function fixGaps(accessToken: string, config: BackportConfig, pr: PullRequest) {
   const labelsToAdd = getVersionLabelsToAdd(config, pr);
 
   if (labelsToAdd.length > 0) {
