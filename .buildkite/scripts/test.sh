@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-echo '--- npm install'
-npm install
+echo '--- npm ci'
+npm ci
 
 echo '--- Lint'
 npm run lint
