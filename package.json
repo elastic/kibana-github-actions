@@ -53,7 +53,7 @@
     "@types/jest": "^29.5.8",
     "@types/lodash": "^4.17.20",
     "@types/mocha": "^10.0.6",
-    "@types/node": "^17.0.5",
+    "@types/node": "^24.19.1",
     "@types/semver": "^7.3.10",
     "@types/uuid": "^8.3.1",
     "@types/yargs": "^15.0.14",
