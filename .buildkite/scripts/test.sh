@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-echo '--- npm install'
-npm install
+echo '--- npm ci'
+npm ci
 
 echo '--- Lint'
 npm run lint
@@ -19,5 +19,6 @@ GIT_CHANGES="$(git ls-files --modified)"
 if [[ "$GIT_CHANGES" ]]; then
   echo "ERROR: 'npm run build' caused changes to the following files:"
   echo "$GIT_CHANGES"
+  git diff
   exit 1
 fi
