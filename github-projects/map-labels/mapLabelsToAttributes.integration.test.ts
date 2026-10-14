@@ -498,5 +498,64 @@ describe('mapLabelsToAttributes', () => {
       expect(mockGqlUpdateFieldValue).toHaveBeenCalledTimes(2);
       expect(result.success).toHaveLength(1);
     });
+
+    it('should update all fields mapped from a single label', async () => {
+      const issuesWithoutFields = [
+        {
+          __typename: 'ProjectV2Item',
+          id: 'item-id-123',
+          fullDatabaseId: 123,
+          fieldValues: {
+            nodes: [],
+          },
+          content: {
+            __typename: 'Issue',
+            id: 'issue-id-123',
+            number: 123,
+            title: 'Test Issue',
+            url: 'https://github.com/test-owner/test-repo/issues/123',
+            resourcePath: '/test-owner/test-repo/issues/123',
+            repository: {
+              name: 'test-repo',
+              owner: { id: 'owner-id' },
+            },
+            labels: {
+              nodes: [{ name: 'Team:DataDiscovery' }],
+            },
+          },
+        },
+      ];
+
+      // A single label mapping to two fields: Size and Priority
+      const mappingContent = JSON.stringify({
+        'Team:DataDiscovery': {
+          Size: 'Small',
+          Priority: 'High',
+        },
+      });
+
+      mockReadFileSync.mockReturnValue(mappingContent);
+      mockGqlGetIssuesForProject.mockResolvedValue(issuesWithoutFields);
+
+      const result = await mapLabelsToAttributes(baseArgs);
+
+      // Both fields from the single label should be updated
+      expect(mockGqlUpdateFieldValue).toHaveBeenCalledTimes(2);
+      expect(mockGqlUpdateFieldValue).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          fieldName: 'Size',
+          optionId: 'option-small',
+        }),
+      );
+      expect(mockGqlUpdateFieldValue).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          fieldName: 'Priority',
+          optionId: 'option-high',
+        }),
+      );
+      expect(result.success).toHaveLength(1);
+    });
   });
 });

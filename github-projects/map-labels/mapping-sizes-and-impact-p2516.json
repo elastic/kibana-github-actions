@@ -1,0 +1,53 @@
+{
+  "loe:small": {
+    "Size": {
+      "value": "🐇 Small (2-3d)",
+      "override": true
+    }
+  },
+  "loe:medium": {
+    "Size": {
+      "value": "🐄 Medium (1-2w)",
+      "override": true
+    }
+  },
+  "loe:large": {
+    "Size": {
+      "value": "🐙 Large (2-4w)",
+      "override": true
+    }
+  },
+  "loe:x-large": {
+    "Size": {
+      "value": "🐳 X-Large (>4w)",
+      "override": true
+    }
+  },
+  "loe:needs-research": null,
+  "Team:DataDiscovery": {
+    "Team": "Discover",
+    "Workstream": "Home::Discover"
+  },
+  "Team:ESQL": {
+    "Team": "Discover",
+    "Workstream": "Home::Discover"
+  },
+  "Team:Visualizations": {
+    "Team": "Dashboards"
+  },
+  "Team:Presentations": {
+    "Team": "Dashboards"
+  },
+  "Team:SharedUX": {
+    "Team": "Global UX"
+  },
+  "Team:EUI": {
+    "Team": "Global UX"
+  },
+  "Team:ML": {
+    "Team": "Search ML"
+  },
+  "Team:Search": {
+    "Team": "Search ML"
+  }
+}

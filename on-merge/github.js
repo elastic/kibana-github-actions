@@ -1,7 +1,41 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GithubWrapper = void 0;
 const github_1 = require("@actions/github");
+const core = __importStar(require("@actions/core"));
 class GithubWrapper {
     constructor({ accessToken, owner, repo }) {
         this.github = (0, github_1.getOctokit)(accessToken).rest;
@@ -9,6 +43,7 @@ class GithubWrapper {
         this.repo = repo;
     }
     async getFileContent(filePath, ref = 'main') {
+        core.info(`[GH-API] Fetching file content: ${filePath} (ref: ${ref})`);
         const response = await this.github.repos.getContent({
             owner: this.owner,
             repo: this.repo,
@@ -16,12 +51,14 @@ class GithubWrapper {
             path: filePath,
         });
         const content = Buffer.from(response.data.content, 'base64').toString();
+        core.info(`[GH-API] Successfully fetched ${filePath}, size: ${content.length} bytes`);
         if (filePath.endsWith('.json')) {
             return JSON.parse(content);
         }
         return content;
     }
     async addLabels(issue, labels) {
+        core.info(`[GH-API] Adding labels to issue #${issue.number}: ${labels.join(', ')}`);
         const response = await this.github.issues.addLabels({
             owner: this.owner,
             repo: this.repo,
@@ -33,36 +70,82 @@ class GithubWrapper {
                 issue.labels.push({ name: label });
             }
         }
+        core.info(`[GH-API] Labels added successfully to issue #${issue.number}`);
         return response.data;
     }
     removeLabels(issue, labels) {
+        core.info(`[GH-API] Removing labels from issue #${issue.number}: ${labels.join(', ')}`);
         return Promise.all(labels.map((label) => this.removeLabel(issue, label)));
     }
     async removeLabel(issue, label) {
+        core.info(`[GH-API] Removing label from issue #${issue.number}: ${label}`);
         issue.labels = issue.labels.filter((l) => l.name !== label);
-        return this.github.issues.removeLabel({
+        const response = await this.github.issues.removeLabel({
             owner: this.owner,
             repo: this.repo,
             issue_number: issue.number,
             name: label,
         });
+        core.info(`[GH-API] Label removed successfully from issue #${issue.number}: ${label}`);
+        return response;
     }
     async createComment(issueNumber, body) {
+        core.info(`[GH-API] Creating comment on issue #${issueNumber}, length: ${body.length} chars`);
         const response = await this.github.issues.createComment({
             owner: this.owner,
             repo: this.repo,
             issue_number: issueNumber,
             body,
         });
+        core.info(`[GH-API] Comment created successfully on issue #${issueNumber}`);
         return response.data;
     }
+    async getApprovers(pullNumber) {
+        var _a;
+        core.info(`[GH-API] Fetching reviews for PR #${pullNumber}`);
+        const response = await this.github.pulls.listReviews({
+            owner: this.owner,
+            repo: this.repo,
+            pull_number: pullNumber,
+        });
+        // Walk reviews chronologically and keep the latest state per reviewer,
+        // so a dismissed/changed approval doesn't count.
+        const latestStateByUser = new Map();
+        for (const review of response.data) {
+            const login = (_a = review.user) === null || _a === void 0 ? void 0 : _a.login;
+            if (!login || !review.state)
+                continue;
+            latestStateByUser.set(login, review.state);
+        }
+        const approvers = Array.from(latestStateByUser.entries())
+            .filter(([, state]) => state === 'APPROVED')
+            .map(([login]) => login);
+        core.info(`[GH-API] Found ${approvers.length} approver(s) for PR #${pullNumber}: ${approvers.join(', ')}`);
+        return approvers;
+    }
+    async hasOpenOrMergedBackport(pullNumber, targetBranch) {
+        const head = `${this.owner}:backport/${targetBranch}/pr-${pullNumber}`;
+        core.info(`[GH-API] Checking for an existing backport PR with head ${head}`);
+        const response = await this.github.pulls.list({
+            owner: this.owner,
+            repo: this.repo,
+            head,
+            state: 'all',
+            per_page: 10,
+        });
+        const existing = response.data.some((pullRequest) => pullRequest.state === 'open' || Boolean(pullRequest.merged_at));
+        core.info(`[GH-API] Open or merged backport for ${targetBranch}: ${existing}`);
+        return existing;
+    }
     async updatePullRequest(number, updateFields) {
+        core.info(`[GH-API] Updating PR #${number}, body length: ${updateFields.body.length} chars`);
         const response = await this.github.pulls.update({
             owner: this.owner,
             repo: this.repo,
             pull_number: number,
             ...updateFields,
         });
+        core.info(`[GH-API] PR #${number} updated successfully`);
         return response.data;
     }
 }
