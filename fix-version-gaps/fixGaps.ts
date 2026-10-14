@@ -1,5 +1,7 @@
-import { Octokit } from '@octokit/rest';
+import { getOctokit } from '@actions/github';
 import { PullRequest } from '@octokit/webhooks-definitions/schema';
+
+type Octokit = ReturnType<typeof getOctokit>['rest'];
 
 export function getLowestVersionsOnPr(pr: PullRequest) {
   const lowestVersionsOnPr: Record<string, string> = {};
@@ -90,9 +92,7 @@ export async function fixGaps(accessToken: string, config: BackportConfig, pr: P
   const labelsToAdd = getVersionLabelsToAdd(config, pr);
 
   if (labelsToAdd.length > 0) {
-    const octokit = new Octokit({
-      auth: accessToken,
-    });
+    const octokit = getOctokit(accessToken).rest;
 
     await createComment(octokit, pr, labelsToAdd);
     await addLabels(octokit, pr, labelsToAdd);

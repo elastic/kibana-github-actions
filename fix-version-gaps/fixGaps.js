@@ -5,7 +5,7 @@ exports.getVersionsFromBackportConfig = getVersionsFromBackportConfig;
 exports.getVersionLabelsToAdd = getVersionLabelsToAdd;
 exports.getCommentFromLabels = getCommentFromLabels;
 exports.fixGaps = fixGaps;
-const rest_1 = require("@octokit/rest");
+const github_1 = require("@actions/github");
 function getLowestVersionsOnPr(pr) {
     const lowestVersionsOnPr = {};
     for (const label of pr.labels) {
@@ -77,9 +77,7 @@ function addLabels(octokit, pr, labelsToAdd) {
 async function fixGaps(accessToken, config, pr) {
     const labelsToAdd = getVersionLabelsToAdd(config, pr);
     if (labelsToAdd.length > 0) {
-        const octokit = new rest_1.Octokit({
-            auth: accessToken,
-        });
+        const octokit = (0, github_1.getOctokit)(accessToken).rest;
         await createComment(octokit, pr, labelsToAdd);
         await addLabels(octokit, pr, labelsToAdd);
     }
