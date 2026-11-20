@@ -295,6 +295,10 @@ async function resolveBackportAssignees(
   );
   if (approvers.length) {
     core.info(`[ASSIGNEES] Using PR approvers as fallback: ${approvers.join(', ')}`);
+    // so backport reminders on the source PR reach a person
+    await githubWrapper.addAssignees(pullRequest.number, approvers).catch((error) => {
+      core.warning(`[ASSIGNEES] Failed to assign approvers to PR #${pullRequest.number}: ${error.message}`);
+    });
     return approvers;
   }
 
@@ -305,7 +309,7 @@ async function resolveBackportAssignees(
 }
 
 function isBotUser(login: string): boolean {
-  return login === 'Copilot' || login.includes('[bot]');
+  return login === 'kibanamachine' || login === 'Copilot' || login.includes('[bot]');
 }
 
 function isPRBackportToCurrentRelease(pullRequest: { labels: { name: string }[] }, currentLabel: string) {

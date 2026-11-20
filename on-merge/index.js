@@ -252,13 +252,17 @@ async function resolveBackportAssignees(githubWrapper, pullRequest) {
     const approvers = (await githubWrapper.getApprovers(pullRequest.number)).filter((login) => !isBotUser(login));
     if (approvers.length) {
         core.info(`[ASSIGNEES] Using PR approvers as fallback: ${approvers.join(', ')}`);
+        // so backport reminders on the source PR reach a person
+        await githubWrapper.addAssignees(pullRequest.number, approvers).catch((error) => {
+            core.warning(`[ASSIGNEES] Failed to assign approvers to PR #${pullRequest.number}: ${error.message}`);
+        });
         return approvers;
     }
     core.warning(`[ASSIGNEES] No fallback assignees found for bot-authored PR #${pullRequest.number}, falling back to author`);
     return [author];
 }
 function isBotUser(login) {
-    return login === 'Copilot' || login.includes('[bot]');
+    return login === 'kibanamachine' || login === 'Copilot' || login.includes('[bot]');
 }
 function isPRBackportToCurrentRelease(pullRequest, currentLabel) {
     return ((0, util_1.getVersionLabels)(pullRequest.labels).length === 1 &&
