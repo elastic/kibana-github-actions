@@ -100,6 +100,15 @@ class GithubWrapper {
         core.info(`[GH-API] Comment created successfully on issue #${issueNumber}`);
         return response.data;
     }
+    async addAssignees(issueNumber, assignees) {
+        core.info(`[GH-API] Assigning ${assignees.join(', ')} to issue #${issueNumber}`);
+        await this.github.issues.addAssignees({
+            owner: this.owner,
+            repo: this.repo,
+            issue_number: issueNumber,
+            assignees,
+        });
+    }
     async getApprovers(pullNumber) {
         var _a;
         core.info(`[GH-API] Fetching reviews for PR #${pullNumber}`);
