@@ -88,6 +88,16 @@ export class GithubWrapper {
     return response.data;
   }
 
+  async addAssignees(issueNumber: number, assignees: string[]) {
+    core.info(`[GH-API] Assigning ${assignees.join(', ')} to issue #${issueNumber}`);
+    await this.github.issues.addAssignees({
+      owner: this.owner,
+      repo: this.repo,
+      issue_number: issueNumber,
+      assignees,
+    });
+  }
+
   async getApprovers(pullNumber: number): Promise<string[]> {
     core.info(`[GH-API] Fetching reviews for PR #${pullNumber}`);
     const response = await this.github.pulls.listReviews({

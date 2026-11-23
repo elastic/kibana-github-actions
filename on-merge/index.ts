@@ -177,6 +177,16 @@ async function runOnMergeAction() {
       `[BACKPORT-RUN] Initiating backport for PR #${pullRequest.number} to ${pendingTargets.length} target(s)`,
     );
     const assignees = await resolveBackportAssignees(githubWrapper, pullRequest);
+    if (!assignees.includes(pullRequest.user.login)) {
+      // so backport reminders on the source PR reach a person
+      await githubWrapper.addAssignees(pullRequest.number, assignees).catch((error) => {
+        core.warning(
+          `[ASSIGNEES] Failed to assign ${assignees.join(', ')} to PR #${pullRequest.number}: ${
+            error.message
+          }`,
+        );
+      });
+    }
     core.info(
       `[BACKPORT-RUN] Backport config: assignees=[${assignees.join(
         ', ',
@@ -305,7 +315,7 @@ async function resolveBackportAssignees(
 }
 
 function isBotUser(login: string): boolean {
-  return login === 'Copilot' || login.includes('[bot]');
+  return login === 'kibanamachine' || login === 'Copilot' || login.includes('[bot]');
 }
 
 function isPRBackportToCurrentRelease(pullRequest: { labels: { name: string }[] }, currentLabel: string) {

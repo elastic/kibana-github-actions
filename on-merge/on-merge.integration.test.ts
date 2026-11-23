@@ -17,10 +17,12 @@ const mockOctokit = {
       addLabels: jest.fn(() => Promise.resolve({ data: {} })),
       removeLabel: jest.fn(() => Promise.resolve({ data: {} })),
       createComment: jest.fn(() => Promise.resolve({ data: {} })),
+      addAssignees: jest.fn(() => Promise.resolve({ data: {} })),
     },
     pulls: {
       update: jest.fn(() => Promise.resolve({ data: {} })),
       list: jest.fn(() => Promise.resolve({ data: [] })),
+      listReviews: jest.fn(() => Promise.resolve({ data: [] })),
     },
   },
 };
@@ -315,8 +317,37 @@ describe('On-Merge Action', () => {
         },
       });
 
+      expect(mockOctokit.rest.issues.addAssignees).not.toHaveBeenCalled();
+
       // Restore environment
       process.env = originalEnv;
+    });
+
+    it('assigns the approvers of a kibanamachine PR to its backports and to the PR', async () => {
+      mockContext.payload.pull_request.user.login = 'kibanamachine';
+      mockContext.payload.pull_request.labels = [{ name: 'backport:version' }, { name: 'v9.1.4' }];
+      mockOctokit.rest.pulls.listReviews.mockResolvedValueOnce({
+        data: [
+          { user: { login: 'reviewer' }, state: 'APPROVED' },
+          { user: { login: 'github-actions[bot]' }, state: 'APPROVED' },
+        ],
+      } as any);
+
+      const { main: runOnMergeAction } = require('./index');
+
+      await runOnMergeAction();
+
+      expect(mockBackportRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: expect.objectContaining({ assignees: ['reviewer'] }),
+        }),
+      );
+      expect(mockOctokit.rest.issues.addAssignees).toHaveBeenCalledWith({
+        owner: 'elastic',
+        repo: 'kibana',
+        issue_number: 12345,
+        assignees: ['reviewer'],
+      });
     });
 
     it('comments on a release branch gap without backporting it', async () => {

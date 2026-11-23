@@ -160,6 +160,12 @@ async function runOnMergeAction() {
         // Start backport for the calculated targets
         core.info(`[BACKPORT-RUN] Initiating backport for PR #${pullRequest.number} to ${pendingTargets.length} target(s)`);
         const assignees = await resolveBackportAssignees(githubWrapper, pullRequest);
+        if (!assignees.includes(pullRequest.user.login)) {
+            // so backport reminders on the source PR reach a person
+            await githubWrapper.addAssignees(pullRequest.number, assignees).catch((error) => {
+                core.warning(`[ASSIGNEES] Failed to assign ${assignees.join(', ')} to PR #${pullRequest.number}: ${error.message}`);
+            });
+        }
         core.info(`[BACKPORT-RUN] Backport config: assignees=[${assignees.join(', ')}], autoMerge=true, autoMergeMethod=squash`);
         const logFilePath = path.join(os.tmpdir(), `backport-${pullRequest.number}.log`);
         core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
@@ -258,7 +264,7 @@ async function resolveBackportAssignees(githubWrapper, pullRequest) {
     return [author];
 }
 function isBotUser(login) {
-    return login === 'Copilot' || login.includes('[bot]');
+    return login === 'kibanamachine' || login === 'Copilot' || login.includes('[bot]');
 }
 function isPRBackportToCurrentRelease(pullRequest, currentLabel) {
     return ((0, util_1.getVersionLabels)(pullRequest.labels).length === 1 &&
