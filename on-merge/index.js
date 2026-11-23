@@ -160,6 +160,12 @@ async function runOnMergeAction() {
         // Start backport for the calculated targets
         core.info(`[BACKPORT-RUN] Initiating backport for PR #${pullRequest.number} to ${pendingTargets.length} target(s)`);
         const assignees = await resolveBackportAssignees(githubWrapper, pullRequest);
+        if (!assignees.includes(pullRequest.user.login)) {
+            // so backport reminders on the source PR reach a person
+            await githubWrapper.addAssignees(pullRequest.number, assignees).catch((error) => {
+                core.warning(`[ASSIGNEES] Failed to assign ${assignees.join(', ')} to PR #${pullRequest.number}: ${error.message}`);
+            });
+        }
         core.info(`[BACKPORT-RUN] Backport config: assignees=[${assignees.join(', ')}], autoMerge=true, autoMergeMethod=squash`);
         const logFilePath = path.join(os.tmpdir(), `backport-${pullRequest.number}.log`);
         core.info(`[BACKPORT-RUN] Log file: ${logFilePath}`);
@@ -252,10 +258,6 @@ async function resolveBackportAssignees(githubWrapper, pullRequest) {
     const approvers = (await githubWrapper.getApprovers(pullRequest.number)).filter((login) => !isBotUser(login));
     if (approvers.length) {
         core.info(`[ASSIGNEES] Using PR approvers as fallback: ${approvers.join(', ')}`);
-        // so backport reminders on the source PR reach a person
-        await githubWrapper.addAssignees(pullRequest.number, approvers).catch((error) => {
-            core.warning(`[ASSIGNEES] Failed to assign approvers to PR #${pullRequest.number}: ${error.message}`);
-        });
         return approvers;
     }
     core.warning(`[ASSIGNEES] No fallback assignees found for bot-authored PR #${pullRequest.number}, falling back to author`);

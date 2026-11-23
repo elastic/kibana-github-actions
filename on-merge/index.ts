@@ -177,6 +177,16 @@ async function runOnMergeAction() {
       `[BACKPORT-RUN] Initiating backport for PR #${pullRequest.number} to ${pendingTargets.length} target(s)`,
     );
     const assignees = await resolveBackportAssignees(githubWrapper, pullRequest);
+    if (!assignees.includes(pullRequest.user.login)) {
+      // so backport reminders on the source PR reach a person
+      await githubWrapper.addAssignees(pullRequest.number, assignees).catch((error) => {
+        core.warning(
+          `[ASSIGNEES] Failed to assign ${assignees.join(', ')} to PR #${pullRequest.number}: ${
+            error.message
+          }`,
+        );
+      });
+    }
     core.info(
       `[BACKPORT-RUN] Backport config: assignees=[${assignees.join(
         ', ',
@@ -295,10 +305,6 @@ async function resolveBackportAssignees(
   );
   if (approvers.length) {
     core.info(`[ASSIGNEES] Using PR approvers as fallback: ${approvers.join(', ')}`);
-    // so backport reminders on the source PR reach a person
-    await githubWrapper.addAssignees(pullRequest.number, approvers).catch((error) => {
-      core.warning(`[ASSIGNEES] Failed to assign approvers to PR #${pullRequest.number}: ${error.message}`);
-    });
     return approvers;
   }
 
